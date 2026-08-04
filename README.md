@@ -93,7 +93,7 @@ Issueがある場合は番号も入れる: `feature/12-login-form`
 
 ### Pull Request
 
-1. 作業ブランチを push し、`main` 宛てにPRを作成する
+1. 作業ブランチを push し、`dev` 宛てにPRを作成する
 2. PRの説明に変更内容と確認方法(動作確認手順)を書く
 3. **レビュー1名以上の承認**を必須とする
 4. マージ方法は **Squash and merge** に統一する
