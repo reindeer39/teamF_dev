@@ -12,3 +12,34 @@ Thumbs.db
 # Logs
 *.log
 
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+*.egg
+.Python
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Django
+*.sqlite3
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (frontend)
+node_modules/
