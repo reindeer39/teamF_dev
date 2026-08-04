@@ -1,0 +1,14 @@
+.navigation-button {
+  width: 80vw;
+  padding: 25px 25px;
+  border: none;
+  border-radius: 8px;
+  background-color: #316745;
+  color: #ffffff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.navigation-button:hover {
+  background-color: #1d4ed8;
+}
