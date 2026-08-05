@@ -3,12 +3,12 @@ import './NavigationButton.css';
 function NavigationButton({
   children,
   onClick,
+  disabled = false,
   width = null,
   height = null,
   backgroundColor = null,
   hoverColor = null,
   textColor = null,
-  disabled = false,
 }) {
   return (
     <button

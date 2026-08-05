@@ -21,12 +21,12 @@
 .select-send-money__list {
   margin: 0;
   padding: 0;
-  border-top: 1px solid #dddddd;
+  /* border-top: 1px solid #dddddd; */
   list-style: none;
 }
 
 .select-send-money__user {
-  border-bottom: 1px solid #dddddd;
+  /* border-bottom: 1px solid #dddddd; */
 }
 
 .select-send-money__user-button {
@@ -45,6 +45,10 @@
 
 .select-send-money__user-button:hover {
   background: #f2f7f4;
+}
+
+.select-send-money__user:not(:last-child) {
+  border-bottom: 1px solid #e5e5e5;
 }
 
 .select-send-money__icon {

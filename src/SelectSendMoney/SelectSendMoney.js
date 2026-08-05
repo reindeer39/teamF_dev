@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getRecipientList } from '../api/user';
-import userIcon from './user_icon.png';
+import { getRecipientList } from '../api/users';
+import userIcon from '../images/human1.png';
 import './SelectSendMoney.css';
 
 function SelectSendMoney({ senderAccountNumber, onSelectRecipient, onBack }) {

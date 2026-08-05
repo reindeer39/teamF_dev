@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import recipientIcon from './icon/human2.png';
-import { createTransfer, getRecipientInfo } from './api/user';
+import recipientIcon from '../images/human2.png';
+import { createTransfer, getRecipientInfo } from '../api/users';
 import './ProcessSendMoney.css';
+import NavigationButton from '../components/NavigationButton';
 
 function ProcessSendMoney({
   senderAccountNumber,
@@ -43,7 +44,7 @@ function ProcessSendMoney({
   const canSubmit =
     Number.isInteger(numericAmount) &&
     numericAmount >= 1 &&
-    numericAmount <= currentBalance &&
+    numericAmount <= Number(currentBalance) &&
     !loading &&
     !submitting;
 
@@ -110,7 +111,6 @@ function ProcessSendMoney({
             className="amount-input"
             type="number"
             min="1"
-            max={currentBalance}
             step="1"
             inputMode="numeric"
             placeholder="金額"
@@ -134,9 +134,16 @@ function ProcessSendMoney({
       </section>
 
       {error && <p className="screen-message screen-message--error">{error}</p>}
-      <button className="send-button" type="submit" disabled={!canSubmit}>
+      <NavigationButton
+        width="100%"
+        height="54px"
+        backgroundColor="#e76f75"
+        hoverColor="#d75d64"
+        disabled={!canSubmit}
+        onClick={handleSubmit}
+      >
         {submitting ? '送金中...' : '送金'}
-      </button>
+      </NavigationButton>
     </form>
   );
 }

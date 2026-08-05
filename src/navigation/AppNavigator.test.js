@@ -1,13 +1,13 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import TopScreen from './TopScreen';
+import AppNavigator from './AppNavigator';
 import {
   createTransfer,
   getRecipientInfo,
   getRecipientList,
   getUserSummary,
-} from './api/user';
+} from '../api/users';
 
-jest.mock('./api/user');
+jest.mock('../api/users');
 
 const summary = {
   account_number: '1000001',
@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 test('DBから取得した口座情報と操作ボタンを表示する', async () => {
-  render(<TopScreen />);
+  render(<AppNavigator />);
 
   expect(await screen.findByText('山田太郎')).toBeInTheDocument();
   expect(screen.getByText('97,000円')).toBeInTheDocument();
@@ -56,7 +56,7 @@ test('DBから取得した口座情報と操作ボタンを表示する', async 
 });
 
 test('送金ボタンからAPIを呼び出して送金完了まで遷移する', async () => {
-  render(<TopScreen />);
+  render(<AppNavigator />);
 
   const transferButton = await screen.findByRole('button', { name: '送金する' });
   await waitFor(() => expect(transferButton).toBeEnabled());
