@@ -5,3 +5,25 @@
 .select-send-money__list {
   text-align: center;
 }
+
+.select-send-money__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.select-send-money__user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  min-height: max(10vh, 64px);
+  padding: 0 16px;
+}
+
+.select-send-money__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
