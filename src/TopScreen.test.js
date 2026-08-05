@@ -5,9 +5,9 @@ import {
   getRecipientInfo,
   getRecipientList,
   getUserSummary,
-} from './api/user';
+} from './api/users';
 
-jest.mock('./api/user');
+jest.mock('./api/users');
 
 const summary = {
   account_number: '1000001',

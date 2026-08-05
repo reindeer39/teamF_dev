@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import recipientIcon from '../images/human2.png';
-import { createTransfer, getRecipientInfo } from '../api/user';
+import { createTransfer, getRecipientInfo } from '../api/users';
 import './ProcessSendMoney.css';
 import NavigationButton from '../components/NavigationButton';
 
@@ -44,6 +44,7 @@ function ProcessSendMoney({
   const canSubmit =
     Number.isInteger(numericAmount) &&
     numericAmount >= 1 &&
+    numericAmount <= Number(currentBalance) &&
     !loading &&
     !submitting;
 
