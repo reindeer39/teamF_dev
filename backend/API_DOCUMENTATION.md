@@ -2,6 +2,8 @@
 
 BASE URL: `http://localhost:8000` (`http://127.0.0.1:8000`)
 
+ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND_FLOW_GUIDE.md](BACKEND_FLOW_GUIDE.md)を参照してください。
+
 ---
 
 ## 公式Stepとの対応

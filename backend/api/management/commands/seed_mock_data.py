@@ -1,3 +1,9 @@
+"""共有JSONを各開発者のSQLiteへ投入するカスタム管理コマンド。
+
+APIが利用するAccountとTransactionを、fixture形式ではない通常のJSONから
+作成します。実行方法は `python manage.py seed_mock_data` です。
+"""
+
 import json
 import uuid
 from pathlib import Path
@@ -24,6 +30,7 @@ class Command(BaseCommand):
         return Path(settings.BASE_DIR) / "api" / "mock_data" / "mock_data.json"
 
     def handle(self, *args, **options):
+        # DBへ書き込む前にJSON全体を検証し、不正データの途中登録を防ぐ。
         data = self._load_and_validate(self.get_mock_data_path())
 
         account_created = 0
@@ -32,8 +39,10 @@ class Command(BaseCommand):
         transaction_updated = 0
 
         try:
+            # Account作成からTransaction作成までを全部成功・全部取消にする。
             with transaction.atomic():
                 if options["reset"]:
+                    # 外部キー制約に従い、必ずTransactionを先に削除する。
                     transaction_numbers = [
                         item["parsed_transaction_number"]
                         for item in data["transactions"]
@@ -47,6 +56,7 @@ class Command(BaseCommand):
                     Account.objects.filter(account_number__in=account_numbers).delete()
 
                 for item in data["accounts"]:
+                    # 口座番号が既存なら更新、なければ新規作成する。
                     _, created = Account.objects.update_or_create(
                         account_number=item["account_number"],
                         defaults={
@@ -59,6 +69,7 @@ class Command(BaseCommand):
                     account_updated += int(not created)
 
                 for index, item in enumerate(data["transactions"]):
+                    # 外部キーへ渡すため、JSONの口座番号からAccountを取得する。
                     sender = self._get_account(
                         item["sender_account_number"], index, "sender_account_number"
                     )
