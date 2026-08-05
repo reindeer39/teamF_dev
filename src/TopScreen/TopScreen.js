@@ -7,6 +7,7 @@ import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import { ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 import NavigationButton from '../components/NavigationButton';
+import BillingStatusScreen from '../BillingStatus/BillingStatusScreen';
 
 function TopScreen() {
   const [currentScreen, setCurrentScreen] = useState('profile');
@@ -76,6 +77,10 @@ function TopScreen() {
     return <NextScreen onBack={() => setCurrentScreen('profile')} />;
   }
 
+  if (currentScreen === 'billingStatus') {
+    return <BillingStatusScreen onBack={() => setCurrentScreen('profile')} />;
+  }
+
   const userName = account?.user_name || '読み込み中';
   const accountNumber = account?.account_number || ACCOUNT_NUMBER;
   const accountBalance = account
@@ -125,6 +130,17 @@ function TopScreen() {
           onClick={() => setCurrentScreen('billing')}
         >
           請求する
+        </NavigationButton>
+
+        <NavigationButton
+          width={buttonWidth}
+          height={buttonHeight}
+          backgroundColor={buttonColor}
+          hoverColor={buttonHoverColor}
+          textColor={buttonTextColor}
+          onClick={() => setCurrentScreen('billingStatus')}
+        >
+          請求状態確認
         </NavigationButton>
       </div>
     </div>
