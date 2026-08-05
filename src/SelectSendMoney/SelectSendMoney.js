@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { fetchUsers } from '../api/users';
-import user_icon from './user_icon.png';
+import user_icon from '../images/human1.png';
 import './SelectSendMoney.css';
 
-function SelectSendMoney() {
+function SelectSendMoney({ onSelectUser }) {
   const [users, setUsers] = useState([]);
 
   useEffect(() => {
@@ -22,12 +22,17 @@ function SelectSendMoney() {
       <ul className="select-send-money__list">
         {users.map((user) => (
           <li key={user.id} className="select-send-money__user">
-            <img
-              className="select-send-money__icon"
-              src={user.iconUrl ?? user_icon}
-              alt=""
-            />
-
+            <button
+              type="button"
+              className="select-send-money__user-button"
+              onClick={() => onSelectUser(user.user_id)}
+            >
+              <img
+                className="select-send-money__icon"
+                src={user.iconUrl ?? user_icon}
+                alt=""
+              />
+            </button>
             <span>{user.name}</span>
           </li>
         ))}
