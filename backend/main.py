@@ -11,7 +11,7 @@ from config.config import AppConfig
 class ApplicationLauncher(AppConfig):
     """
     アプリケーション起動クラス
-    構成情報（AppConfig）を継承し、環境をロードしてサービスを起動します。
+    構成情報（AppConfig）を継承し、環境をロードしてサービスを起動
     """
     def __init__(self):
         os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
