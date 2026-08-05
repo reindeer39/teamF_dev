@@ -60,6 +60,8 @@ BASE URL: `http://localhost:8000` (`http://127.0.0.1:8000`)
   ```json
   {
     "sender_account_number": "123456",
+    "sender_account_balance": 100000,
+    "recipient_account_number": "654321",
     "recipient_icon": "/static/images/user2.png",
     "recipient_name": "佐藤花子"
   }
@@ -78,8 +80,19 @@ BASE URL: `http://localhost:8000` (`http://127.0.0.1:8000`)
   }
   ```
   * `message`: null許容 (optional、Step 6)
-* **Response**: `200 OK` (レスポンスボディなし)
-* **エラー制御**: 送金額が送金元の預金残高を超える場合 (`account_balance < transfer_amount`)、バックエンド側で `400 Bad Request` (`{"error": "Insufficient account balance"}`) を返却します。
+* **Response**: `200 OK`
+  ```json
+  {
+    "transaction_number": "33333333-3333-4333-8333-333333333333",
+    "sender_account_number": "123456",
+    "recipient_account_number": "654321",
+    "transfer_amount": 5000,
+    "message": "ランチ代",
+    "sender_account_balance": 95000
+  }
+  ```
+* **エラー制御**: 送金額は1以上の整数、メッセージは200文字以内、送金元と送金先は別口座である必要があります。残高不足の場合は`400 Bad Request`（`{"error": "Insufficient account balance"}`）を返します。
+* **DB処理**: 送金元残高の減算、送金先残高の加算、Transaction作成を`transaction.atomic()`内で実行します。途中で失敗した場合はすべてロールバックします。
 
 ---
 

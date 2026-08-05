@@ -8,6 +8,7 @@
 - [セットアップ](#セットアップ)
 - [仕様書](#仕様書)
 - [データベースとモックデータ](#データベースとモックデータ)
+- [React・API・データベース連携](#reactapiデータベース連携)
 - [Git運用ルール](#git運用ルール)
 
 ## 構成
@@ -45,7 +46,6 @@ npm start
 Create React App で構築されています。詳細は [CRAドキュメント](https://facebook.github.io/create-react-app/docs/getting-started) を参照してください。
 
 ### バックエンド (Django)
-
 ```bash
 cd backend
 python3 -m venv venv
@@ -262,6 +262,100 @@ python manage.py runserver
 ```
 
 ブラウザで`http://127.0.0.1:8000/admin/`を開いてください。Accountでは口座番号、ユーザー名、残高を、Transactionでは取引番号、送金元、送金先、送金金額、メッセージ、送金日時を確認できます。
+
+## React・API・データベース連携
+
+### 画面操作とAPIの対応
+
+マージしたトップ画面、送金先選択画面、送金処理画面を以下の流れで連携しています。
+
+| Reactの操作 | API | データベース処理 |
+|---|---|---|
+| トップ画面を表示 | `GET /api/user/{account_number}/summary` | `accounts`からユーザー名・口座番号・残高を取得 |
+| 「送金する」を押す | `GET /api/user/{account_number}/recipient_list` | 送金元以外のAccountを取得 |
+| 送金先を選択 | `GET /api/user/{sender}/{recipient}/recipient` | 送金元残高と送金先情報を取得 |
+| 金額・メッセージを入力して「送金」を押す | `POST /api/user/{sender}/{recipient}/transfer` | 送金元残高を減算、送金先残高を加算、Transactionを作成 |
+| 送金完了後にトップへ戻る | `GET /api/user/{account_number}/summary` | 更新後の口座残高を再取得 |
+
+開発用のログイン口座番号は`src/account.js`の`ACCOUNT_NUMBER`で指定しています。現在は`mock_data.json`に存在する`1000001`を使用しています。ログイン機能を実装した後は、ここをログインユーザーの口座番号へ置き換えてください。
+
+### API連携コードの場所
+
+- `src/api/user.js`: ReactからDjango APIを呼ぶ処理を集約
+- `src/TopScreen.js`: トップ画面の口座情報取得と画面遷移
+- `src/SelectSendMoney/SelectSendMoney.js`: 送金先一覧の取得
+- `src/ProcessSendMoney.js`: 送金先情報の取得と送金POST
+- `backend/api/urls.py`: APIのURL定義
+- `backend/api/views.py`: Accountの取得、残高更新、Transaction登録
+- `backend/api/tests.py`: APIリクエストからDB更新までの自動テスト
+
+コード内で次の文字列を検索すると、APIとDBの連携箇所を確認できます。
+
+```bash
+rg -n "API連携ポイント" src backend/api
+```
+
+各連携箇所には、共同開発者向けに`API連携ポイント`から始まるコメントを記載しています。APIを追加した場合も、Reactの呼び出し元とDjangoのDB更新箇所に同じ形式のコメントを追加してください。
+
+### 開発サーバーの起動
+
+ターミナルを2つ開きます。
+
+ターミナル1（Django）：
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py migrate
+python manage.py seed_mock_data
+python manage.py runserver
+```
+
+ターミナル2（React・プロジェクトルート）：
+
+```bash
+npm install
+npm start
+```
+
+Reactは`http://localhost:3000`、Django APIは`http://127.0.0.1:8000/api/`で起動します。APIの接続先を変える場合は、React起動前に`REACT_APP_API_BASE_URL`を指定できます。
+
+```bash
+REACT_APP_API_BASE_URL=http://127.0.0.1:8000/api npm start
+```
+
+### APIとDB連携の確認方法
+
+Django API単体は次のコマンドで確認できます。
+
+```bash
+curl http://127.0.0.1:8000/api/user/1000001/summary
+curl http://127.0.0.1:8000/api/user/1000001/recipient_list
+```
+
+送金POSTはDBの残高と履歴を実際に変更します。開発用データであることを確認してから実行してください。
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"transfer_amount":1000,"message":"API確認"}' \
+  http://127.0.0.1:8000/api/user/1000001/1000002/transfer
+```
+
+実行後、Django管理画面で両口座の残高とTransaction履歴を確認できます。自動テストではテスト専用DBを使うため、ローカルの`db.sqlite3`を変更せずに連携を確認できます。
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py test api
+```
+
+React側のAPI呼び出しと画面遷移は次で確認します。
+
+```bash
+CI=true npm test -- --watchAll=false
+npm run build
+```
 
 ## Git運用ルール
 

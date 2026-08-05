@@ -9,6 +9,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from rest_framework.test import APITestCase
 
 from api.management.commands.seed_mock_data import Command as SeedCommand
 from api.models import Account, Transaction
@@ -229,3 +230,106 @@ class SeedMockDataCommandTests(TestCase):
         self.assertTrue(
             Transaction.objects.filter(pk=manual_transaction_number).exists()
         )
+
+
+class TransferAPITests(APITestCase):
+    def setUp(self):
+        self.sender = Account.objects.create(
+            account_number="4000001",
+            user_icon="/icons/sender.png",
+            user_name="API送金者",
+            account_balance=10000,
+        )
+        self.recipient = Account.objects.create(
+            account_number="4000002",
+            user_icon="/icons/recipient.png",
+            user_name="API受取人",
+            account_balance=2000,
+        )
+
+    def test_summary_api_reads_account_from_database(self):
+        response = self.client.get("/api/user/4000001/summary")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["user_name"], "API送金者")
+        self.assertEqual(response.data["account_balance"], 10000)
+
+    def test_recipient_list_api_excludes_sender(self):
+        response = self.client.get("/api/user/4000001/recipient_list")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["recipient_list"]), 1)
+        self.assertEqual(
+            response.data["recipient_list"][0]["account_number"], "4000002"
+        )
+
+    def test_recipient_info_api_reads_both_accounts(self):
+        response = self.client.get("/api/user/4000001/4000002/recipient")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["recipient_name"], "API受取人")
+        self.assertEqual(response.data["sender_account_balance"], 10000)
+
+    def test_transfer_api_updates_balances_and_creates_history(self):
+        response = self.client.post(
+            "/api/user/4000001/4000002/transfer",
+            {"transfer_amount": 1500, "message": "API連携テスト"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.sender.refresh_from_db()
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.sender.account_balance, 8500)
+        self.assertEqual(self.recipient.account_balance, 3500)
+        transfer = Transaction.objects.get()
+        self.assertEqual(transfer.transfer_amount, 1500)
+        self.assertEqual(transfer.message, "API連携テスト")
+        self.assertEqual(
+            response.data["transaction_number"], str(transfer.transaction_number)
+        )
+
+    def test_transfer_api_rejects_zero_amount_without_changing_database(self):
+        response = self.client.post(
+            "/api/user/4000001/4000002/transfer",
+            {"transfer_amount": 0},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.sender.refresh_from_db()
+        self.recipient.refresh_from_db()
+        self.assertEqual(self.sender.account_balance, 10000)
+        self.assertEqual(self.recipient.account_balance, 2000)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_transfer_api_rejects_insufficient_balance(self):
+        response = self.client.post(
+            "/api/user/4000001/4000002/transfer",
+            {"transfer_amount": 10001},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "Insufficient account balance")
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_transfer_api_rejects_same_sender_and_recipient(self):
+        response = self.client.post(
+            "/api/user/4000001/4000001/transfer",
+            {"transfer_amount": 100},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_transfer_api_rejects_unknown_account(self):
+        response = self.client.post(
+            "/api/user/4000001/4999999/transfer",
+            {"transfer_amount": 100},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Transaction.objects.count(), 0)

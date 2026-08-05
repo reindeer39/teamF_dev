@@ -1,5 +1,7 @@
-import logo from './logo.svg';
+import logo from './icon/human2.png';
 import './App.css';
+import { useState } from 'react';
+import TransferScreen from './TransferScreen';
 
 function App() {
   return (
@@ -7,7 +9,7 @@ function App() {
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
         <p>
-          Edit <code>src/App.js</code> and save to reload.
+          ウイルスに感染しました
         </p>
         <a
           className="App-link"
@@ -17,6 +19,8 @@ function App() {
         >
           Learn React
         </a>
+
+        <button>送金する</button>
       </header>
     </div>
   );
