@@ -3,6 +3,7 @@ import './NavigationButton.css';
 function NavigationButton({
   children,
   onClick,
+  disabled = false,
   width = null,
   height = null,
   backgroundColor = null,
@@ -14,6 +15,7 @@ function NavigationButton({
       className="navigation-button"
       type="button"
       onClick={onClick}
+      disabled={disabled}
       style={{
         width,
         height,
