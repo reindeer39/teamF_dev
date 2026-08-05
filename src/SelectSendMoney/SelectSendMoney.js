@@ -5,6 +5,7 @@ import './SelectSendMoney.css';
 
 function SelectSendMoney({ onSelectUser }) {
   const [users, setUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   useEffect(() => {
     async function loadUsers() {
@@ -14,6 +15,15 @@ function SelectSendMoney({ onSelectUser }) {
 
     loadUsers();
   }, []);
+
+  if (selectedUserId !== null) {
+    return (
+      <ProcessSendMoney
+        accountNumber={selectedUserId}
+        onBack={() => setSelectedUserId(null)}
+      />
+    );
+  }
 
   return (
     <main className="select-send-money">
