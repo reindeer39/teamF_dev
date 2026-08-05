@@ -8,12 +8,14 @@ function NavigationButton({
   backgroundColor = null,
   hoverColor = null,
   textColor = null,
+  disabled = false,
 }) {
   return (
     <button
       className="navigation-button"
       type="button"
       onClick={onClick}
+      disabled={disabled}
       style={{
         width,
         height,
