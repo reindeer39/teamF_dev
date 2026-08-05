@@ -12,3 +12,23 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.screen-message {
+  width: min(85vw, 720px);
+  margin: 20px auto;
+  color: #333333;
+  text-align: center;
+}
+
+.screen-message--error {
+  color: #b42318;
+}
+
+.text-button {
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: #316745;
+  font-size: 1rem;
+  cursor: pointer;
+}
