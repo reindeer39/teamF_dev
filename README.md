@@ -15,7 +15,17 @@
 
 ```
 teamF_dev/
-├── src/            # フロントエンド (React / Create React App)
+├── src/                         # フロントエンド (React / Create React App)
+│   ├── navigation/               # 画面遷移(ルーティング)の管理
+│   │   └── AppNavigator.js
+│   ├── TopScreen/                 # 画面: プロフィール(トップ)
+│   ├── SelectSendMoney/            # 画面: 送金先一覧
+│   ├── ProcessSendMoney/            # 画面: 送金処理
+│   ├── NextScreen/                  # 画面: 遷移確認用
+│   ├── components/                   # 共通UIパーツ
+│   ├── api/                           # Django APIを呼ぶ処理
+│   ├── images/
+│   └── account.js                     # 開発用の固定ログイン口座番号
 ├── public/
 ├── package.json
 └── backend/        # バックエンド (Django)
@@ -279,12 +289,36 @@ python manage.py runserver
 
 開発用のログイン口座番号は`src/account.js`の`ACCOUNT_NUMBER`で指定しています。現在は`mock_data.json`に存在する`1000001`を使用しています。ログイン機能を実装した後は、ここをログインユーザーの口座番号へ置き換えてください。
 
+### 画面遷移(ルーティング)の構成
+
+`react-router`のようなライブラリは使わず、`src/navigation/AppNavigator.js`が画面遷移をすべて管理する自前の仕組みです。
+
+- `AppNavigator`が`currentScreen`という状態(`'profile' | 'recipients' | 'transfer' | 'billing'`)を持ち、値に応じて表示する画面コンポーネントを切り替える
+- 口座情報(`account`)の取得も`AppNavigator`が行い、必要な画面へpropsとして渡す
+- 各画面(`TopScreen` / `SelectSendMoney` / `ProcessSendMoney` / `NextScreen`)は他の画面を直接importせず、`onBack`や`onSelectRecipient`などのコールバックをpropsで受け取り、遷移は`AppNavigator`に委ねる
+
+```text
+index.js
+  └─ AppNavigator（currentScreen・account を管理）
+       ├─ currentScreen === 'profile'    → TopScreen
+       ├─ currentScreen === 'recipients' → SelectSendMoney
+       ├─ currentScreen === 'transfer'   → ProcessSendMoney
+       └─ currentScreen === 'billing'    → NextScreen
+```
+
+画面を追加する場合の手順:
+
+1. 既存画面と同じ形で `src/<画面名>/<画面名>.js` フォルダを作成する
+2. `AppNavigator.js` に新しい `currentScreen` の値と、対応する画面コンポーネントの分岐を追加する
+3. 画面から次の画面へ遷移したい場合は、直接importせず `AppNavigator` から渡されたコールバックpropsを呼び出す
+
 ### API連携コードの場所
 
-- `src/api/user.js`: ReactからDjango APIを呼ぶ処理を集約
-- `src/TopScreen.js`: トップ画面の口座情報取得と画面遷移
+- `src/api/users.js`: ReactからDjango APIを呼ぶ処理を集約
+- `src/navigation/AppNavigator.js`: 画面遷移の管理と口座情報の取得
+- `src/TopScreen/TopScreen.js`: トップ画面(プロフィール)の表示
 - `src/SelectSendMoney/SelectSendMoney.js`: 送金先一覧の取得
-- `src/ProcessSendMoney.js`: 送金先情報の取得と送金POST
+- `src/ProcessSendMoney/ProcessSendMoney.js`: 送金先情報の取得と送金POST
 - `backend/api/urls.py`: APIのURL定義
 - `backend/api/views.py`: Accountの取得、残高更新、Transaction登録
 - `backend/api/tests.py`: APIリクエストからDB更新までの自動テスト

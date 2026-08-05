@@ -1,83 +1,16 @@
-import { useEffect, useState } from 'react';
 import './TopScreen.css';
 import icon from '../images/human1.png';
-import NextScreen from '../NextScreen';
-import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
-import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
-import { ACCOUNT_NUMBER } from '../account';
-import { getUserSummary } from '../api/users';
 import NavigationButton from '../components/NavigationButton';
 
-function TopScreen() {
-  const [currentScreen, setCurrentScreen] = useState('profile');
-  const [account, setAccount] = useState(null);
-  const [selectedRecipient, setSelectedRecipient] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [reloadCount, setReloadCount] = useState(0);
+function TopScreen({ account, loading, error, onSelectRecipient, onBilling }) {
   const buttonWidth = '80vw';
   const buttonHeight = '72px';
   const buttonColor = '#316745';
   const buttonHoverColor = '#9ca3af';
   const buttonTextColor = '#ffffff';
 
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError('');
-
-    // API連携ポイント: 画面表示時と送金完了後に最新残高をDBから再取得する。
-    getUserSummary(ACCOUNT_NUMBER)
-      .then((data) => {
-        if (active) setAccount(data);
-      })
-      .catch((apiError) => {
-        if (active) setError(`口座情報を取得できませんでした: ${apiError.message}`);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [reloadCount]);
-
-  if (currentScreen === 'recipients') {
-    return (
-      <SelectSendMoney
-        senderAccountNumber={ACCOUNT_NUMBER}
-        onBack={() => setCurrentScreen('profile')}
-        onSelectRecipient={(recipient) => {
-          setSelectedRecipient(recipient);
-          setCurrentScreen('transfer');
-        }}
-      />
-    );
-  }
-
-  if (currentScreen === 'transfer' && selectedRecipient) {
-    return (
-      <ProcessSendMoney
-        senderAccountNumber={ACCOUNT_NUMBER}
-        recipientAccountNumber={selectedRecipient.account_number}
-        accountBalance={account?.account_balance || 0}
-        onBack={() => setCurrentScreen('recipients')}
-        onTransferComplete={() => {
-          setSelectedRecipient(null);
-          setCurrentScreen('profile');
-          setReloadCount((count) => count + 1);
-        }}
-      />
-    );
-  }
-
-  if (currentScreen === 'billing') {
-    return <NextScreen onBack={() => setCurrentScreen('profile')} />;
-  }
-
   const userName = account?.user_name || '読み込み中';
-  const accountNumber = account?.account_number || ACCOUNT_NUMBER;
+  const accountNumber = account?.account_number || '---';
   const accountBalance = account
     ? `${account.account_balance.toLocaleString('ja-JP')}円`
     : '---円';
@@ -111,7 +44,7 @@ function TopScreen() {
           hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
           disabled={loading || !account}
-          onClick={() => setCurrentScreen('recipients')}
+          onClick={onSelectRecipient}
         >
           送金する
         </NavigationButton>
@@ -122,7 +55,7 @@ function TopScreen() {
           backgroundColor={buttonColor}
           hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
-          onClick={() => setCurrentScreen('billing')}
+          onClick={onBilling}
         >
           請求する
         </NavigationButton>
