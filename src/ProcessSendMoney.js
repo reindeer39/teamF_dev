@@ -2,6 +2,9 @@ import recipientIcon from './icon/human2.png';
 import './ProcessSendMoney.css';
 
 function ProcessSendMoney() {
+  const recipientName = 'サンプル 氏名';
+  const accountBalance = 80000;
+
   return (
     <main className="send-money-screen">
       <section className="recipient-section">
@@ -13,13 +16,19 @@ function ProcessSendMoney() {
             src={recipientIcon}
             alt="送金先のユーザー"
           />
-          <p className="recipient-name">サンプル 氏名</p>
+
+          <p className="recipient-name">
+            {recipientName}
+          </p>
         </div>
       </section>
 
       <section className="limit-section">
         <p className="section-label">送金上限額</p>
-        <p className="limit-amount">50,000円</p>
+
+        <p className="limit-amount">
+          {accountBalance.toLocaleString('ja-JP')}円
+        </p>
       </section>
 
       <section className="amount-section">
@@ -33,9 +42,11 @@ function ProcessSendMoney() {
             className="amount-input"
             type="number"
             min="0"
+            max={accountBalance}
             inputMode="numeric"
             placeholder="金額"
           />
+
           <span className="yen-label">円</span>
         </div>
       </section>
