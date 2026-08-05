@@ -6,20 +6,35 @@
 
 - [構成](#構成)
 - [セットアップ](#セットアップ)
+- [仕様書](#仕様書)
+- [データベースとモックデータ](#データベースとモックデータ)
+- [React・API・データベース連携](#reactapiデータベース連携)
 - [Git運用ルール](#git運用ルール)
 
 ## 構成
 
 ```
 teamF_dev/
-├── src/            # フロントエンド (React / Create React App)
+├── src/                         # フロントエンド (React / Create React App)
+│   ├── navigation/               # 画面遷移(ルーティング)の管理
+│   │   └── AppNavigator.js
+│   ├── TopScreen/                 # 画面: プロフィール(トップ)
+│   ├── SelectSendMoney/            # 画面: 送金先一覧
+│   ├── ProcessSendMoney/            # 画面: 送金処理
+│   ├── NextScreen/                  # 画面: 遷移確認用
+│   ├── components/                   # 共通UIパーツ
+│   ├── api/                           # Django APIを呼ぶ処理
+│   ├── images/
+│   └── account.js                     # 開発用の固定ログイン口座番号
 ├── public/
 ├── package.json
 └── backend/        # バックエンド (Django)
     ├── config/      # プロジェクト設定
     ├── api/         # APIアプリ
     ├── manage.py
-    └── requirements.txt
+    ├── requirements.txt
+    ├── API_DOCUMENTATION.md       # API仕様書
+    └── DATABASE_DOCUMENTATION.md  # データベース仕様書
 ```
 
 ## セットアップ
@@ -41,6 +56,64 @@ npm start
 Create React App で構築されています。詳細は [CRAドキュメント](https://facebook.github.io/create-react-app/docs/getting-started) を参照してください。
 
 ### バックエンド (Django)
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py seed_mock_data
+python manage.py runserver
+```
+
+`http://localhost:8000` で起動します。React 開発サーバー(`localhost:3000`)からのアクセスは CORS 許可済みです。
+
+## 仕様書
+
+- [バックエンド連携ガイド](backend/BACKEND_FLOW_GUIDE.md) — ReactからAPI、Django ORM、SQLite、レスポンスまでの初心者向け解説
+- [API仕様書](backend/API_DOCUMENTATION.md) — エンドポイント一覧、リクエスト/レスポンス形式
+- [データベース仕様書](backend/DATABASE_DOCUMENTATION.md) — テーブル定義、制約、ER概要
+
+## データベースとモックデータ
+
+### 今回実装した内容
+
+送金アプリ用として、Djangoの`api`アプリに以下を実装しています。
+
+- SQLiteデータベース: `backend/db.sqlite3`
+- 口座モデル・テーブル: `Account` / `accounts`
+- 送金履歴モデル・テーブル: `Transaction` / `transactions`
+- モデルのマイグレーション: `backend/api/migrations/0001_initial.py`
+- 共有用モックデータ: `backend/api/mock_data/mock_data.json`
+- モックデータ投入コマンド: `python manage.py seed_mock_data`
+- JSON対象データの安全な再作成: `python manage.py seed_mock_data --reset`
+- AccountとTransactionのDjango管理画面
+- モデル、制約、モックデータ投入処理のテスト
+
+`Account`には口座番号、ユーザーアイコン、ユーザー名、預金残高を保存します。`Transaction`には取引番号、送金元口座、送金先口座、送金金額、メッセージ、送金日時を保存します。
+
+データベース制約により、残高は0以上、送金金額は1以上、送金元と送金先は別口座である必要があります。また、取引から参照されている口座は誤って削除されないように保護されています。
+
+### 共同開発における共有方法
+
+SQLite本体の`backend/db.sqlite3`は、開発者ごとにローカルで作成します。このファイルをGitで直接共有すると、各自の作業データが衝突したり、他の開発者のデータを上書きしたりするため、Git管理対象外にしています。
+
+代わりに、次の2種類のファイルをGitで共有します。
+
+- テーブル構造: `backend/api/models.py`と`backend/api/migrations/`
+- 共通で使用するデータ: `backend/api/mock_data/mock_data.json`
+
+各開発者がマイグレーションとモックデータ投入コマンドを実行することで、それぞれの`db.sqlite3`に同じテーブルと同じデータを作成できます。
+
+```text
+models.py + migrations（テーブル構造） ─┐
+                                         ├─ 各開発者がコマンドを実行 → 各自のdb.sqlite3
+mock_data.json（共有するレコード） ─────┘
+```
+
+### 初めて環境を作る開発者
+
+リポジトリを取得した後、プロジェクトルートから以下を実行してください。
 
 ```bash
 cd backend
@@ -48,12 +121,286 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
+python manage.py seed_mock_data
 python manage.py runserver
 ```
 
-`http://localhost:8000` で起動します。React 開発サーバー(`localhost:3000`)からのアクセスは CORS 許可済みです。
+`migrate`がローカルの`db.sqlite3`にテーブルを作成し、`seed_mock_data`が共有JSONの口座と送金履歴を登録します。
+
+### pull後に共有データを自分のDBへ反映する
+
+他のメンバーの変更を取り込み、共有されたテーブル構造とデータを自分のDBへ反映するには、プロジェクトルートで以下を実行してください。
+
+```bash
+git pull
+cd backend
+source venv/bin/activate
+python manage.py migrate
+python manage.py seed_mock_data
+```
+
+新しいマイグレーションがなければ`migrate`は何も変更しません。`seed_mock_data`は何度実行しても、同じ口座番号や取引番号のレコードを重複登録しません。既存レコードはJSONの内容で更新されます。
+
+通常、共同開発者が最新データを取り込むために必要なコマンドは次の2つです。
+
+```bash
+python manage.py migrate
+python manage.py seed_mock_data
+```
+
+### モックデータを変更してチームへ共有する
+
+共通データを追加・変更する担当者は、以下のファイルを編集します。
+
+```text
+backend/api/mock_data/mock_data.json
+```
+
+JSONはDjango fixture固有の形式ではなく、`accounts`と`transactions`を持つ通常のJSONです。主な記載ルールは次のとおりです。
+
+- `account_number`は文字列として記載する
+- `transaction_number`はUUID形式の文字列として記載する
+- `account_balance`は0以上の整数にする
+- `transfer_amount`は1以上の整数にする
+- `sender_account_number`と`recipient_account_number`には存在する口座番号を記載する
+- 送金元と送金先に同じ口座を指定しない
+- 同じ口座番号または取引番号をJSON内で重複させない
+- JSONにはコメントを書かない。補足説明はREADMEへ記載する
+
+編集した担当者は、コミット前に以下を実行して内容を確認してください。
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py seed_mock_data
+python manage.py test api
+```
+
+問題がなければ、JSONをGitへコミットしてpushします。`db.sqlite3`はコミットしません。
+
+```bash
+cd ..
+git add backend/api/mock_data/mock_data.json
+git commit -m "feat: モックデータを更新"
+git push
+```
+
+変更を受け取るメンバーはpull後に以下を実行します。
+
+```bash
+git pull
+cd backend
+source venv/bin/activate
+python manage.py seed_mock_data
+```
+
+これにより、Gitで共有されたJSONの内容が各メンバーのローカルSQLiteへ反映されます。
+
+### `seed_mock_data`の動作
+
+```bash
+python manage.py seed_mock_data
+```
+
+Accountを先に登録し、その後Transactionを登録します。口座番号と取引番号を識別キーとしているため、実行結果は次のようになります。
+
+- 初回実行: JSONのデータを新規登録
+- 2回目以降: 同じキーのデータを更新し、レコードは重複しない
+- JSONを変更して再実行: 既存データを新しい内容へ更新
+- 既存Transactionの更新: `created_at`は変更せず、送金元、送金先、金額、メッセージだけを更新
+
+処理全体はデータベーストランザクションで保護されています。不正なUUID、不足口座、負の残高、0円以下の送金などが見つかった場合は処理を中断し、途中まで登録したデータもすべてロールバックします。
+
+### JSONの内容で対象データを作り直す
+
+JSON対象のデータを一度削除し、JSONの状態から再作成したい場合に使用します。
+
+```bash
+python manage.py seed_mock_data --reset
+```
+
+削除・登録順序は以下です。
+
+1. JSONに取引番号が記載されているTransactionだけを削除
+2. JSONに口座番号が記載されているAccountだけを削除
+3. JSONのAccountを登録
+4. JSONのTransactionを登録
+
+データベース全体のflushや全件削除は行いません。JSONに記載されていない手動追加データは残ります。また、JSON外のTransactionが対象Accountを参照している場合は、安全のため削除せず処理全体をロールバックします。
+
+通常のデータ更新には`seed_mock_data`を使用し、対象データをJSONから完全に作り直す必要がある場合だけ`--reset`を使用してください。
+
+### モデルを変更した場合の共有方法
+
+モデルのフィールド追加など、データベース構造を変更した担当者は以下を実行します。
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py makemigrations api
+python manage.py migrate
+python manage.py test api
+```
+
+変更した`models.py`だけでなく、生成されたマイグレーションファイルもGitへコミットしてください。
+
+```bash
+cd ..
+git add backend/api/models.py backend/api/migrations/
+git commit -m "feat: データベース構造を更新"
+git push
+```
+
+変更を受け取ったメンバーは、pull後に次を実行します。通常、受け取る側で`makemigrations`を実行する必要はありません。
+
+```bash
+git pull
+cd backend
+source venv/bin/activate
+python manage.py migrate
+python manage.py seed_mock_data
+```
+
+### 管理画面でデータを確認する
+
+初回のみ管理ユーザーを作成します。
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+ブラウザで`http://127.0.0.1:8000/admin/`を開いてください。Accountでは口座番号、ユーザー名、残高を、Transactionでは取引番号、送金元、送金先、送金金額、メッセージ、送金日時を確認できます。
+
+## React・API・データベース連携
+
+### 画面操作とAPIの対応
+
+マージしたトップ画面、送金先選択画面、送金処理画面を以下の流れで連携しています。
+
+| Reactの操作 | API | データベース処理 |
+|---|---|---|
+| トップ画面を表示 | `GET /api/user/{account_number}/summary` | `accounts`からユーザー名・口座番号・残高を取得 |
+| 「送金する」を押す | `GET /api/user/{account_number}/recipient_list` | 送金元以外のAccountを取得 |
+| 送金先を選択 | `GET /api/user/{sender}/{recipient}/recipient` | 送金元残高と送金先情報を取得 |
+| 金額・メッセージを入力して「送金」を押す | `POST /api/user/{sender}/{recipient}/transfer` | 送金元残高を減算、送金先残高を加算、Transactionを作成 |
+| 送金完了後にトップへ戻る | `GET /api/user/{account_number}/summary` | 更新後の口座残高を再取得 |
+
+開発用のログイン口座番号は`src/account.js`の`ACCOUNT_NUMBER`で指定しています。現在は`mock_data.json`に存在する`1000001`を使用しています。ログイン機能を実装した後は、ここをログインユーザーの口座番号へ置き換えてください。
+
+### 画面遷移(ルーティング)の構成
+
+`react-router`のようなライブラリは使わず、`src/navigation/AppNavigator.js`が画面遷移をすべて管理する自前の仕組みです。
+
+- `AppNavigator`が`currentScreen`という状態(`'profile' | 'recipients' | 'transfer' | 'billing'`)を持ち、値に応じて表示する画面コンポーネントを切り替える
+- 口座情報(`account`)の取得も`AppNavigator`が行い、必要な画面へpropsとして渡す
+- 各画面(`TopScreen` / `SelectSendMoney` / `ProcessSendMoney` / `NextScreen`)は他の画面を直接importせず、`onBack`や`onSelectRecipient`などのコールバックをpropsで受け取り、遷移は`AppNavigator`に委ねる
+
+```text
+index.js
+  └─ AppNavigator（currentScreen・account を管理）
+       ├─ currentScreen === 'profile'    → TopScreen
+       ├─ currentScreen === 'recipients' → SelectSendMoney
+       ├─ currentScreen === 'transfer'   → ProcessSendMoney
+       └─ currentScreen === 'billing'    → NextScreen
+```
+
+画面を追加する場合の手順:
+
+1. 既存画面と同じ形で `src/<画面名>/<画面名>.js` フォルダを作成する
+2. `AppNavigator.js` に新しい `currentScreen` の値と、対応する画面コンポーネントの分岐を追加する
+3. 画面から次の画面へ遷移したい場合は、直接importせず `AppNavigator` から渡されたコールバックpropsを呼び出す
+
+### API連携コードの場所
+
+- `src/api/users.js`: ReactからDjango APIを呼ぶ処理を集約
+- `src/navigation/AppNavigator.js`: 画面遷移の管理と口座情報の取得
+- `src/TopScreen/TopScreen.js`: トップ画面(プロフィール)の表示
+- `src/SelectSendMoney/SelectSendMoney.js`: 送金先一覧の取得
+- `src/ProcessSendMoney/ProcessSendMoney.js`: 送金先情報の取得と送金POST
+- `backend/api/urls.py`: APIのURL定義
+- `backend/api/views.py`: Accountの取得、残高更新、Transaction登録
+- `backend/api/tests.py`: APIリクエストからDB更新までの自動テスト
+
+コード内で次の文字列を検索すると、APIとDBの連携箇所を確認できます。
+
+```bash
+rg -n "API連携ポイント" src backend/api
+```
+
+各連携箇所には、共同開発者向けに`API連携ポイント`から始まるコメントを記載しています。APIを追加した場合も、Reactの呼び出し元とDjangoのDB更新箇所に同じ形式のコメントを追加してください。
+
+### 開発サーバーの起動
+
+ターミナルを2つ開きます。
+
+ターミナル1（Django）：
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py migrate
+python manage.py seed_mock_data
+python manage.py runserver
+```
+
+ターミナル2（React・プロジェクトルート）：
+
+```bash
+npm install
+npm start
+```
+
+Reactは`http://localhost:3000`、Django APIは`http://127.0.0.1:8000/api/`で起動します。APIの接続先を変える場合は、React起動前に`REACT_APP_API_BASE_URL`を指定できます。
+
+```bash
+REACT_APP_API_BASE_URL=http://127.0.0.1:8000/api npm start
+```
+
+### APIとDB連携の確認方法
+
+Django API単体は次のコマンドで確認できます。
+
+```bash
+curl http://127.0.0.1:8000/api/user/1000001/summary
+curl http://127.0.0.1:8000/api/user/1000001/recipient_list
+```
+
+送金POSTはDBの残高と履歴を実際に変更します。開発用データであることを確認してから実行してください。
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"transfer_amount":1000,"message":"API確認"}' \
+  http://127.0.0.1:8000/api/user/1000001/1000002/transfer
+```
+
+実行後、Django管理画面で両口座の残高とTransaction履歴を確認できます。自動テストではテスト専用DBを使うため、ローカルの`db.sqlite3`を変更せずに連携を確認できます。
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py test api
+```
+
+React側のAPI呼び出しと画面遷移は次で確認します。
+
+```bash
+CI=true npm test -- --watchAll=false
+npm run build
+```
 
 ## Git運用ルール
+
+### データベース・共有データ
+
+- `backend/db.sqlite3` は各開発者のローカルデータベースなのでGitへコミットしない
+- `backend/api/mock_data/mock_data.json` はチームで共有するためGitへコミットする
+- `models.py` を変更した場合は、生成したマイグレーションファイルもコミットする
+- pull後に新しいマイグレーションがある場合は、`python manage.py migrate` を実行する
+- `mock_data.json` が更新された場合は、`python manage.py seed_mock_data` を実行する
 
 ### ブランチ戦略
 
@@ -93,7 +440,7 @@ Issueがある場合は番号も入れる: `feature/12-login-form`
 
 ### Pull Request
 
-1. 作業ブランチを push し、`main` 宛てにPRを作成する
+1. 作業ブランチを push し、`dev` 宛てにPRを作成する
 2. PRの説明に変更内容と確認方法(動作確認手順)を書く
 3. **レビュー1名以上の承認**を必須とする
 4. マージ方法は **Squash and merge** に統一する

@@ -37,9 +37,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
-    "corsheaders",
-    "api",
+    "rest_framework",  # Pythonの辞書をJSONレスポンスへ変換するAPI基盤。
+    "corsheaders",  # React開発サーバーからのAPIアクセスを許可する。
+    "api",  # Account、Transaction、各APIを持つ既存アプリ。
 ]
 
 MIDDLEWARE = [
@@ -53,9 +53,11 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# React (CRA) dev server
+# ReactとDjangoは開発時のポートが異なるため、ブラウザのCORS制限に対して
+# React開発サーバーの接続元だけを明示的に許可する。
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -83,7 +85,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {
     "default": {
+        # models.pyのORM操作はDjangoによりSQLへ変換され、このSQLiteへ届く。
         "ENGINE": "django.db.backends.sqlite3",
+        # BASE_DIRはbackend/なので、実体はbackend/db.sqlite3となる。
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
