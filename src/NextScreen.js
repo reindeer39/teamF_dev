@@ -1,4 +1,4 @@
-import './TopScreen.css';
+import './TopScreen/TopScreen.css';
 import NavigationButton from './components/NavigationButton';
 
 function NextScreen({ onBack }) {

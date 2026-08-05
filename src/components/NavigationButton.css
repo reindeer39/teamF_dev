@@ -1,7 +1,7 @@
 .navigation-button {
   width: 80vw;
   box-sizing: border-box;
-  padding: 25px 25px;
+  padding: 25px;
   border: none;
   border-radius: 8px;
   background-color: var(--button-background-color, #316745);
