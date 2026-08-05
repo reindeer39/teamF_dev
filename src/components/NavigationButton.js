@@ -9,6 +9,7 @@ function NavigationButton({
   backgroundColor = null,
   hoverColor = null,
   textColor = null,
+  disabled = false,
 }) {
   return (
     <button
