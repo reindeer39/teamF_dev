@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils import timezone
 
 from .models import Account, Transaction
 
@@ -17,7 +18,7 @@ class TransactionAdmin(admin.ModelAdmin):
         "recipient",
         "transfer_amount",
         "message",
-        "created_at",
+        "formatted_created_at",
     )
     list_filter = ("created_at",)
     search_fields = (
@@ -27,4 +28,10 @@ class TransactionAdmin(admin.ModelAdmin):
         "recipient__user_name",
         "message",
     )
-    readonly_fields = ("transaction_number", "created_at")
+    readonly_fields = ("transaction_number", "formatted_created_at")
+
+    @admin.display(ordering="created_at", description="created_at")
+    def formatted_created_at(self, obj):
+        if not obj.created_at:
+            return ""
+        return timezone.localtime(obj.created_at).strftime("%Y-%m-%d %H:%M:%S.%f")
