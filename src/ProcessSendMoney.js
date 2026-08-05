@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import recipientIcon from './icon/human2.png';
 import './ProcessSendMoney.css';
+import NavigationButton from './components/NavigationButton';
 
 function ProcessSendMoney() {
   const recipientName = 'サンプル 氏名';
@@ -52,9 +53,15 @@ function ProcessSendMoney() {
         </div>
       </section>
 
-      <button className="send-button" disabled>
+      <NavigationButton
+        className="send-button"
+        width="100%"
+        backgroundColor="#b8b8b8"
+        hoverColor="#b8b8b8"
+        textColor="#ffffff"
+      >
         送金
-      </button>
+      </NavigationButton>
     </main>
   );
 }
