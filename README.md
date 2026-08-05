@@ -70,6 +70,7 @@ python manage.py runserver
 
 ## 仕様書
 
+- [バックエンド連携ガイド](backend/BACKEND_FLOW_GUIDE.md) — ReactからAPI、Django ORM、SQLite、レスポンスまでの初心者向け解説
 - [API仕様書](backend/API_DOCUMENTATION.md) — エンドポイント一覧、リクエスト/レスポンス形式
 - [データベース仕様書](backend/DATABASE_DOCUMENTATION.md) — テーブル定義、制約、ER概要
 

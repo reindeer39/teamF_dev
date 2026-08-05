@@ -1,5 +1,8 @@
-"""
-API ビュークラス定義 (views.py)
+"""React向けAPIの受付、入力検証、DB操作、JSON応答を担当するView。
+
+処理は config/urls.py → api/urls.py → このファイルの順で到着します。
+`Account.objects...`などがDjango ORMによるDB操作、`Response(...)`が
+Reactへ返すJSONレスポンスです。詳しい流れはBACKEND_FLOW_GUIDE.mdを参照。
 """
 from django.db import transaction
 from rest_framework.views import APIView
@@ -17,7 +20,9 @@ class UserSummaryView(APIView):
     def get(self, request, account_number: str):
         try:
             # API連携ポイント: Reactトップ画面へAccountの現在値を返す。
+            # DB操作: URLから受け取った口座番号を主キーとしてaccountsを1件検索。
             user = Account.objects.get(account_number=account_number)
+            # Accountオブジェクトを、Reactが扱える辞書（JSONの元）へ変換する。
             data = {
                 "account_number": user.account_number,
                 "user_icon": user.user_icon,
@@ -26,6 +31,7 @@ class UserSummaryView(APIView):
             }
             return Response(data, status=status.HTTP_200_OK)
         except Account.DoesNotExist:
+            # get()で該当口座がない場合は、成功ではなく404をReactへ返す。
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
@@ -36,10 +42,13 @@ class RecipientListView(APIView):
     """
     def get(self, request, account_number: str):
         # API連携ポイント: React送金先一覧へ送金元以外のAccountを返す。
+        # 最初に送金元自体が存在するか確認し、誤ったURLなら404にする。
         if not Account.objects.filter(account_number=account_number).exists():
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        # DB操作: 自分自身を除外したaccountsのQuerySetを取得する。
         users = Account.objects.exclude(account_number=account_number)
+        # QuerySetの各Accountを、Reactで一覧表示しやすい配列へ変換する。
         recipient_list = [
             {
                 "account_number": user.account_number,
@@ -59,6 +68,7 @@ class RecipientInfoView(APIView):
     def get(self, request, sender_account_number: str, recipient_account_number: str):
         try:
             # API連携ポイント: React送金画面へ送金元残高と送金先情報を返す。
+            # DB操作: 送金元と送金先をそれぞれaccountsから取得する。
             sender = Account.objects.get(account_number=sender_account_number)
             recipient = Account.objects.get(account_number=recipient_account_number)
 
@@ -80,9 +90,11 @@ class TransferView(APIView):
     POST /api/user/{sender_account_number}/{recipient_account_number}/transfer
     """
     def post(self, request, sender_account_number: str, recipient_account_number: str):
+        # ReactがPOSTしたJSONは、DRFによりrequest.dataへ変換される。
         transfer_amount = request.data.get("transfer_amount")
         message = request.data.get("message", "")
 
+        # DB操作前の入力検証。不正な場合は残高や履歴を一切変更しない。
         if transfer_amount is None:
             return Response({"error": "transfer_amount is required"}, status=status.HTTP_400_BAD_REQUEST)
         if type(transfer_amount) is not int or transfer_amount < 1:
@@ -110,14 +122,17 @@ class TransferView(APIView):
                 sender = Account.objects.select_for_update().get(account_number=sender_account_number)
                 recipient = Account.objects.select_for_update().get(account_number=recipient_account_number)
 
+                # DBの最新残高を取得した後で、残高不足を再確認する。
                 if sender.account_balance < transfer_amount:
                     return Response({"error": "Insufficient account balance"}, status=status.HTTP_400_BAD_REQUEST)
 
                 sender.account_balance -= transfer_amount
                 recipient.account_balance += transfer_amount
+                # DB操作: accountsテーブルの残高カラムだけをUPDATEする。
                 sender.save(update_fields=["account_balance"])
                 recipient.save(update_fields=["account_balance"])
 
+                # DB操作: transactionsテーブルへ送金履歴をINSERTする。
                 transfer = Transaction.objects.create(
                     sender=sender,
                     recipient=recipient,
@@ -125,6 +140,7 @@ class TransferView(APIView):
                     message=message,
                 )
 
+            # DB確定後、取引番号と更新後残高をJSONでReactへ返す。
             return Response(
                 {
                     "transaction_number": str(transfer.transaction_number),
@@ -137,4 +153,5 @@ class TransferView(APIView):
                 status=status.HTTP_200_OK,
             )
         except Account.DoesNotExist:
+            # 送金元または送金先が存在しない場合。atomic内の変更は取り消される。
             return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
