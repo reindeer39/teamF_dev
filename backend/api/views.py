@@ -2,6 +2,7 @@
 API ビュークラス定義 (views.py)
 """
 import uuid
+from datetime import datetime
 from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -43,7 +44,7 @@ class UserSummaryView(BaseAPIView):
 
 class RecipientListView(BaseAPIView):
     """
-    Step 2: 送金先一覧の取得
+    Step 3: 送金先一覧の取得
     GET /api/user/{account_number}/recipient_list
     """
     def get(self, request, account_number: str):
@@ -63,7 +64,7 @@ class RecipientListView(BaseAPIView):
 
 class RecipientInfoView(BaseAPIView):
     """
-    Step 3 (Step 4表記): 送信先処理画面取得
+    Step 4: 送金処理画面情報取得
     GET /api/user/{sender_account_number}/{recipient_account_number}/recipient
     """
     def get(self, request, sender_account_number: str, recipient_account_number: str):
@@ -75,7 +76,6 @@ class RecipientInfoView(BaseAPIView):
             
             data = {
                 "sender_account_number": sender.account_number,
-                "sender_bank_balance": sender.account_balance,
                 "recipient_icon": recipient.user_icon,
                 "recipient_name": recipient.user_name,
             }
@@ -86,7 +86,7 @@ class RecipientInfoView(BaseAPIView):
 
 class TransferView(BaseAPIView):
     """
-    Step 4: 送金処理
+    Step 5・6: 送金処理, メッセージ
     POST /api/user/{sender_account_number}/{recipient_account_number}/transfer
     """
     def post(self, request, sender_account_number: str, recipient_account_number: str):
@@ -105,6 +105,10 @@ class TransferView(BaseAPIView):
                 sender = UserAccount.objects.select_for_update().get(account_number=sender_account_number)
                 recipient = UserAccount.objects.select_for_update().get(account_number=recipient_account_number)
 
+                # 0. 残高不足チェック (バックエンド側でのバリデーション制御)
+                if sender.account_balance < int(transfer_amount):
+                    return Response({"error": "Insufficient account balance"}, status=status.HTTP_400_BAD_REQUEST)
+
                 # 1. 自身の預金残高から送金金額を減算
                 sender.account_balance -= int(transfer_amount)
                 
@@ -117,12 +121,14 @@ class TransferView(BaseAPIView):
 
                 # 3. 送金履歴の保存 (モデルが存在する場合)
                 if TransferTransaction is not None:
+                    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
                     TransferTransaction.objects.create(
                         transaction_number=str(uuid.uuid4()),
                         sender_account=sender,
                         recipient_account=recipient,
                         transfer_amount=int(transfer_amount),
                         message=message,
+                        time=current_time_str,
                     )
 
             # 正常終了時 200 OK
