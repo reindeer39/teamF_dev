@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import './TopScreen.css';
-import icon from './icons/human1.png';
-import NextScreen from './NextScreen';
-import ProcessSendMoney from './ProcessSendMoney';
-import SelectSendMoney from './SelectSendMoney/SelectSendMoney';
-import { ACCOUNT_NUMBER } from './account';
-import { getUserSummary } from './api/user';
-import NavigationButton from './components/NavigationButton';
+import icon from '../images/human1.png';
+import NextScreen from '../NextScreen';
+import ProcessSendMoney from '../ProcessSendMoney';
+import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
+import { ACCOUNT_NUMBER } from '../account';
+import { getUserSummary } from '../api/user';
+import NavigationButton from '../components/NavigationButton';
 
 function TopScreen() {
   const [currentScreen, setCurrentScreen] = useState('profile');
@@ -90,7 +90,7 @@ function TopScreen() {
           <div className="user-profile__details">
             <span className="user-profile__name">{userName}</span>
             <span className="user-profile__account-number">
-              口座番号：{accountNumber}
+              口座番号：{ACCOUNT_NUMBER}
             </span>
           </div>
         </div>

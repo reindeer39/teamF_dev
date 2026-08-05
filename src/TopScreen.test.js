@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import TopScreen from './TopScreen';
+import TopScreen from './TopScreen/TopScreen';
 import {
   createTransfer,
   getRecipientInfo,
