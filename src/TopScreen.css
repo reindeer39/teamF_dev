@@ -1,0 +1,96 @@
+.top-screen {
+  min-height: 100vh;
+  background-color: #ffffff;
+}
+
+.user-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 85vw;
+  box-sizing: border-box;
+  margin:6vh auto 0;
+  padding: 24px;
+  border: 2px solid #333333;
+  border-radius: 16px;
+  background-color: #ffffff;
+}
+
+.user-profile__main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 10vw, 120px);
+  width: 100%;
+}
+
+.user-profile__icon {
+  width:30vmin;
+  height: 30vmin;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-profile__name {
+  color: #000000;
+  font-size: clamp(1rem, 3vmin, 1.5rem);
+  font-weight: 600;
+  text-align: center;
+}
+
+.user-profile__details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8vmin;
+}
+
+.user-profile__account-number {
+  color: #555555;
+  font-size: clamp(0.875rem, 2vmin, 1.125rem);
+}
+
+.user-profile__balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  box-sizing: border-box;
+  padding-top: 24px;
+  border-top: 1px solid #cccccc;
+}
+
+.user-profile__balance-label {
+  color: #555555;
+  font-size: clamp(1rem, 2.5vmin, 1.25rem);
+}
+
+.user-profile__balance-value {
+  color: #000000;
+  font-size: clamp(1.25rem, 4vmin, 2rem);
+}
+
+.navigation-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.next-screen {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 24px;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  text-align: center;
+}

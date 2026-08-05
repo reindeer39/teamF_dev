@@ -45,7 +45,6 @@ npm start
 Create React App で構築されています。詳細は [CRAドキュメント](https://facebook.github.io/create-react-app/docs/getting-started) を参照してください。
 
 ### バックエンド (Django)
-
 ```bash
 cd backend
 python3 -m venv venv
