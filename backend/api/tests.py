@@ -1,3 +1,9 @@
+"""モデル、モック投入、HTTP APIとDBの連携を確認する自動テスト。
+
+テスト実行時はDjangoが一時的なテストDBを作るため、backend/db.sqlite3は
+変更されません。実行コマンドは `python manage.py test api` です。
+"""
+
 import json
 import tempfile
 import uuid
@@ -16,6 +22,7 @@ from api.models import Account, Transaction
 
 
 class ModelTests(TestCase):
+    """models.pyの関連とDB制約を、ORMから直接確認するテスト。"""
     def setUp(self):
         self.sender = Account.objects.create(
             account_number="2000001",
@@ -98,6 +105,7 @@ class ModelTests(TestCase):
 
 
 class SeedMockDataCommandTests(TestCase):
+    """共有JSONの投入、更新、ロールバック、安全なresetを確認するテスト。"""
     def setUp(self):
         self.temp_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_directory.cleanup)
@@ -233,6 +241,7 @@ class SeedMockDataCommandTests(TestCase):
 
 
 class TransferAPITests(APITestCase):
+    """HTTPリクエスト→View→ORM→テストDB→レスポンスの全経路を確認する。"""
     def setUp(self):
         self.sender = Account.objects.create(
             account_number="4000001",
