@@ -17,7 +17,7 @@ function TopScreen() {
   const [error, setError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
   const buttonWidth = '80vw';
-  const buttonHeight = '72px';
+  const buttonHeight = '7vh';
   const buttonColor = '#316745';
   const buttonHoverColor = '#9ca3af';
   const buttonTextColor = '#ffffff';
