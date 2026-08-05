@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import './TopScreen.css';
 import icon from '../images/human1.png';
-import NavigationButton from '../components/NavigationButton';
-import BillingScreen from '../BillingScreen';
-import TransferScreen from '../TransferScreen';
-import { ACCOUNT_NUMBER } from '../account';
+import NavigationButton from './components/NavigationButton';
+import BillingScreen from './BillingScreen';
+import TransferScreen from './TransferScreen';
+import { ACCOUNT_NUMBER } from './account';
 
 const USER = {
   name: 'ユーザー',

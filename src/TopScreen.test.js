@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import TopScreen from './TopScreen/TopScreen';
+import TopScreen from './TopScreen';
 
 test('renders transfer and billing buttons', () => {
   render(<TopScreen />);
