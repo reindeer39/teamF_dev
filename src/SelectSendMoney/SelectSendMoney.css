@@ -1,5 +1,5 @@
 .select-send-money__title {
-  text-align: left;
+  text-align: center;
 }
 
 .select-send-money__list {
@@ -19,6 +19,10 @@
 
   min-height: max(10vh, 64px);
   padding: 0 16px;
+}
+
+.select-send-money__user:not(:last-child) {
+  border-bottom: 1px solid #e5e5e5;
 }
 
 .select-send-money__icon {
