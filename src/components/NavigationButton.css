@@ -1,0 +1,16 @@
+.navigation-button {
+  width: 80vw;
+  box-sizing: border-box;
+  padding: 25px 25px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--button-background-color, #316745);
+  color: var(--button-text-color, #ffffff);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.navigation-button:hover {
+  background-color: var(--button-hover-color, #66706a);
+}
