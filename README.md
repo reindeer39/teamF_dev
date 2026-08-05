@@ -6,6 +6,7 @@
 
 - [構成](#構成)
 - [セットアップ](#セットアップ)
+- [仕様書](#仕様書)
 - [データベースとモックデータ](#データベースとモックデータ)
 - [Git運用ルール](#git運用ルール)
 
@@ -20,7 +21,9 @@ teamF_dev/
     ├── config/      # プロジェクト設定
     ├── api/         # APIアプリ
     ├── manage.py
-    └── requirements.txt
+    ├── requirements.txt
+    ├── API_DOCUMENTATION.md       # API仕様書
+    └── DATABASE_DOCUMENTATION.md  # データベース仕様書
 ```
 
 ## セットアップ
@@ -54,6 +57,11 @@ python manage.py runserver
 ```
 
 `http://localhost:8000` で起動します。React 開発サーバー(`localhost:3000`)からのアクセスは CORS 許可済みです。
+
+## 仕様書
+
+- [API仕様書](backend/API_DOCUMENTATION.md) — エンドポイント一覧、リクエスト/レスポンス形式
+- [データベース仕様書](backend/DATABASE_DOCUMENTATION.md) — テーブル定義、制約、ER概要
 
 ## データベースとモックデータ
 

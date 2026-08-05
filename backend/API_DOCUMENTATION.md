@@ -105,22 +105,6 @@ BASE URL: `http://localhost:8000` (`http://127.0.0.1:8000`)
 
 ---
 
-## データベーススキーマ一覧
+## データベーススキーマ
 
-### `main` テーブル (`UserAccount` モデル)
-| カラム名 | 意味 | 型 |
-|---|---|---|
-| `account_number` | 口座番号 (PK) | str |
-| `user_icon` | ユーザアイコン | str (path) |
-| `user_name` | ユーザ名 | str |
-| `account_balance` | 預金残高 | int |
-
-### `transfer_transaction` テーブル (`TransferTransaction` モデル)
-| カラム名 | 意味 | 型 |
-|---|---|---|
-| `transaction_number` | 取引番号 (PK) | str |
-| `sender_account_number` | fromの口座番号 (FK) | str |
-| `recipient_account_number` | toの口座番号 (FK) | str |
-| `transfer_amount` | 金額 | int |
-| `message` | メッセージ (null許容) | str |
-| `time` | 時間  | str (`YYYY-MM-DD HH:MM:SS.ffffff`) |
+`Account` (`accounts`) / `Transaction` (`transactions`) の詳細なカラム定義・制約は [DATABASE_DOCUMENTATION.md](DATABASE_DOCUMENTATION.md) を参照してください。
