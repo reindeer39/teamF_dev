@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import recipientIcon from './icon/human2.png';
+import recipientIcon from './images/human2.png';
 import { createTransfer, getRecipientInfo } from './api/user';
 import './ProcessSendMoney.css';
 

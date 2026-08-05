@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import './TopScreen.css';
-import icon from './icons/human1.png';
+import icon from './images/human1.png';
 import NextScreen from './NextScreen';
 import ProcessSendMoney from './ProcessSendMoney';
 import SelectSendMoney from './SelectSendMoney/SelectSendMoney';
