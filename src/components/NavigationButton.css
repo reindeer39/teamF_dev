@@ -8,9 +8,11 @@
   color: var(--button-text-color, #ffffff);
   font-size: 1rem;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .navigation-button:hover {
   background-color: var(--button-hover-color, #66706a);
+  box-shadow: 0 4px 10px rgb(0 0 0 / 20%);
+  transform: translateY(-2px);
 }
