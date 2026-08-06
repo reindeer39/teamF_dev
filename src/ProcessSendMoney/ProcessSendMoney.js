@@ -136,7 +136,7 @@ function ProcessSendMoney({
       {error && <p className="screen-message screen-message--error">{error}</p>}
       <NavigationButton
         width="100%"
-        height="54px"
+        height="10vh"
         backgroundColor="#e76f75"
         hoverColor="#d75d64"
         disabled={!canSubmit}
