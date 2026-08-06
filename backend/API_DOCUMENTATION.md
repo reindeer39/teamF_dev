@@ -76,7 +76,18 @@ Django Userと残高0円のAccountを同一トランザクション内で作成�
 
 送金元はURLやJSONでは指定せず、認証トークンに紐づくAccountを使用します。両口座の残高更新とTransaction作成は`transaction.atomic()`内で実行します。
 
-## 請求API
+## React認証済み請求API
+
+以下は現在のReact請求画面が使用するAPIです。すべてToken認証が必要で、口座番号はリクエストから受け取らずログインUserから確定します。
+
+- `POST /invoices/`: `invoice_amount`と`message`からInvoiceを作成し、UUID入り`invoice_link`を返す
+- `GET /invoices/`: ログイン口座が発行した請求一覧を返す
+- `GET /invoices/{invoice_number}/`: 請求リンクに対応する請求元・金額・メッセージ・状態を返す
+- `POST /invoices/{invoice_number}/pay/`: ログイン口座を支払者として残高・Transaction・Invoiceを同一トランザクションで更新する
+
+支払いAPIへ請求金額や口座番号を送る必要はありません。URLのUUIDから取得したInvoiceと認証UserのAccountを使用します。
+
+## 旧請求互換API
 
 ### 請求作成
 

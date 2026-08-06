@@ -7,6 +7,9 @@ config/urls.pyが`/api/`を取り除いた残りのURLをこのファイルへ�
 from django.urls import path
 
 from api.views import (
+    AuthenticatedInvoiceCollectionView,
+    AuthenticatedInvoiceDetailView,
+    AuthenticatedInvoicePayView,
     AuthenticatedRecipientInfoView,
     AuthenticatedRecipientListView,
     AuthenticatedTransferView,
@@ -36,6 +39,21 @@ urlpatterns = [
     path("auth/logout", LogoutView.as_view(), name="logout-legacy"),
     path("auth/me", CurrentUserView.as_view(), name="current-user-legacy"),
     path("account/summary", MyAccountSummaryView.as_view(), name="my-summary"),
+    path(
+        "invoices/",
+        AuthenticatedInvoiceCollectionView.as_view(),
+        name="authenticated-invoice-collection",
+    ),
+    path(
+        "invoices/<uuid:invoice_number>/",
+        AuthenticatedInvoiceDetailView.as_view(),
+        name="authenticated-invoice-detail",
+    ),
+    path(
+        "invoices/<uuid:invoice_number>/pay/",
+        AuthenticatedInvoicePayView.as_view(),
+        name="authenticated-invoice-pay",
+    ),
     path(
         "account/recipients",
         AuthenticatedRecipientListView.as_view(),

@@ -40,6 +40,31 @@ def authenticated_account_data(account):
     }
 
 
+def invoice_data(invoice):
+    """請求画面・請求一覧で共通利用するInvoice情報をJSON化する。"""
+    return {
+        "invoice_number": str(invoice.invoice_number),
+        "invoice_time": timezone.localtime(invoice.created_time).strftime(
+            "%Y-%m-%d %H:%M:%S.%f"
+        ),
+        "invoice_amount": invoice.invoice_amount,
+        "message": invoice.message,
+        "invoice_flag": invoice.invoice_flag,
+        "issuer": account_data(invoice.account_number),
+        "paid_time": (
+            timezone.localtime(invoice.paid_time).strftime("%Y-%m-%d %H:%M:%S.%f")
+            if invoice.paid_time
+            else None
+        ),
+        "paid_by": account_data(invoice.paid_by) if invoice.paid_by else None,
+        "transaction_number": (
+            str(invoice.transaction_number_id)
+            if invoice.transaction_number_id
+            else None
+        ),
+    }
+
+
 def authenticated_account(request):
     """認証ユーザーに紐づくAccountを取得する。"""
     try:
@@ -630,6 +655,167 @@ class InvoiceListView(APIView):
             for invoice in invoices
         ]
         return Response({"invoice_list": invoice_list}, status=status.HTTP_200_OK)
+
+
+class AuthenticatedInvoiceCollectionView(APIView):
+    """ログイン口座による請求作成と、その口座が発行した請求一覧。"""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        issuer = authenticated_account(request)
+        if issuer is None:
+            return Response(
+                {"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        invoices = (
+            Invoice.objects.filter(account_number=issuer)
+            .select_related("account_number", "paid_by", "transaction_number")
+            .order_by("-created_time")
+        )
+        return Response({"invoice_list": [invoice_data(item) for item in invoices]})
+
+    def post(self, request):
+        issuer = authenticated_account(request)
+        if issuer is None:
+            return Response(
+                {"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        invoice_amount = request.data.get("invoice_amount")
+        message = request.data.get("message", "")
+        errors = {}
+        if type(invoice_amount) is not int or invoice_amount < 1:
+            errors["invoice_amount"] = ["請求金額は1円以上の整数にしてください。"]
+        if message is None:
+            message = ""
+        if not isinstance(message, str) or len(message) > 200:
+            errors["message"] = ["メッセージは200文字以内にしてください。"]
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+        invoice = Invoice(
+            invoice_amount=invoice_amount,
+            message=message,
+            account_number=issuer,
+        )
+        try:
+            invoice.full_clean()
+            invoice.save()
+        except ValidationError as exc:
+            return Response(exc.message_dict, status=status.HTTP_400_BAD_REQUEST)
+
+        invoice_link = (
+            f"{settings.FRONTEND_BASE_URL.rstrip('/')}"
+            f"/invoice/{invoice.invoice_number}"
+        )
+        return Response(
+            {**invoice_data(invoice), "invoice_link": invoice_link},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class AuthenticatedInvoiceDetailView(APIView):
+    """請求リンクのUUIDから請求内容を取得する。"""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, invoice_number):
+        try:
+            invoice = (
+                Invoice.objects.select_related(
+                    "account_number", "paid_by", "transaction_number"
+                ).get(invoice_number=invoice_number)
+            )
+        except (Invoice.DoesNotExist, ValidationError, ValueError):
+            return Response(
+                {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(invoice_data(invoice))
+
+
+class AuthenticatedInvoicePayView(APIView):
+    """ログイン口座を支払者として請求を支払う。"""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, invoice_number):
+        payer = authenticated_account(request)
+        if payer is None:
+            return Response(
+                {"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            with transaction.atomic():
+                invoice = (
+                    Invoice.objects.select_for_update()
+                    .select_related("account_number")
+                    .get(invoice_number=invoice_number)
+                )
+                if invoice.invoice_flag == Invoice.InvoiceFlag.PAID:
+                    return Response(
+                        {"error": "この請求は支払済みです。"},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                if payer.pk == invoice.account_number_id:
+                    return Response(
+                        {"error": "自分が発行した請求は支払えません。"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                locked_accounts = {
+                    account.pk: account
+                    for account in Account.objects.select_for_update().filter(
+                        pk__in=[payer.pk, invoice.account_number_id]
+                    )
+                }
+                locked_payer = locked_accounts[payer.pk]
+                payee = locked_accounts[invoice.account_number_id]
+                if locked_payer.account_balance < invoice.invoice_amount:
+                    return Response(
+                        {"error": "口座残高が不足しています。"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                locked_payer.account_balance -= invoice.invoice_amount
+                payee.account_balance += invoice.invoice_amount
+                locked_payer.save(update_fields=["account_balance"])
+                payee.save(update_fields=["account_balance"])
+
+                transfer = Transaction.objects.create(
+                    sender=locked_payer,
+                    recipient=payee,
+                    transfer_amount=invoice.invoice_amount,
+                    message=invoice.message,
+                )
+                invoice.invoice_flag = Invoice.InvoiceFlag.PAID
+                invoice.paid_time = transfer.created_at
+                invoice.paid_by = locked_payer
+                invoice.transaction_number = transfer
+                invoice.full_clean()
+                invoice.save(
+                    update_fields=[
+                        "invoice_flag",
+                        "paid_time",
+                        "paid_by",
+                        "transaction_number",
+                    ]
+                )
+        except (Invoice.DoesNotExist, ValidationError, ValueError, KeyError):
+            return Response(
+                {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(
+            {
+                "invoice_number": str(invoice.invoice_number),
+                "invoice_amount": invoice.invoice_amount,
+                "payment_amount": invoice.invoice_amount,
+                "transaction_number": str(transfer.transaction_number),
+                "payer_account_balance": locked_payer.account_balance,
+            }
+        )
 
 
 class AuthenticatedTransferView(TransferView):

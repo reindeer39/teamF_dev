@@ -21,7 +21,10 @@ teamF_dev/
 │   ├── TopScreen/                 # 画面: プロフィール(トップ)
 │   ├── SelectSendMoney/            # 画面: 送金先一覧
 │   ├── ProcessSendMoney/            # 画面: 送金処理
-│   ├── NextScreen/                  # 画面: 遷移確認用
+│   ├── MakeInvoiceLink/             # 画面: 請求リンク作成
+│   ├── CopyInvoiceLink/             # 画面: 請求リンク表示・コピー
+│   ├── InvoiceStatus/               # 画面: 発行した請求一覧
+│   ├── ProcessPayment/              # 画面: 請求リンクの支払い
 │   ├── components/                   # 共通UIパーツ
 │   ├── auth/                          # 認証状態とログイン・新規登録画面
 │   ├── api/                           # 共通HTTPクライアントと機能別API
@@ -324,27 +327,34 @@ python manage.py seed_mock_data --reset
 | 「送金する」を押す | `GET /api/account/recipients` | ログイン口座以外のAccountを取得 |
 | 送金先を選択 | `GET /api/account/recipients/{recipient}` | 送金先と送金可能残高を取得 |
 | 金額・メッセージを入力して「送金」を押す | `POST /api/transfers/{recipient}` | 認証ユーザーを送金元として残高更新とTransaction作成 |
+| 「請求する」でリンクを作成 | `POST /api/invoices/` | ログイン口座を請求元としてInvoice作成 |
+| 請求状態を確認 | `GET /api/invoices/` | ログイン口座が発行したInvoice一覧を取得 |
+| `/invoice/{invoice_number}`を開く | `GET /api/invoices/{invoice_number}/` | UUIDから請求元・金額・状態を取得 |
+| 「支払う」を押す | `POST /api/invoices/{invoice_number}/pay/` | ログイン口座の残高、Transaction、Invoiceを一括更新 |
 | ログアウト | `POST /api/auth/logout/` | サーバーとブラウザのトークンを削除 |
 
 固定の`src/account.js`は廃止しました。送金元口座はURLやReactの定数ではなく、AuthorizationヘッダーのトークンからDjangoが確定します。
 
 ### 画面遷移(ルーティング)の構成
 
-`react-router`のようなライブラリは使わず、`src/navigation/AppNavigator.js`が画面遷移をすべて管理する自前の仕組みです。
+通常画面は`src/navigation/AppNavigator.js`のstateで切り替え、共有する請求URLだけは`react-router-dom`で`/invoice/{invoice_number}`へルーティングします。
 
-- `AppNavigator`が`currentScreen`という状態(`'profile' | 'recipients' | 'transfer' | 'billing'`)を持ち、値に応じて表示する画面コンポーネントを切り替える
+- `AppNavigator`が`currentScreen`という状態を持ち、値に応じて通常画面を切り替える
 - 口座情報(`account`)の取得も`AppNavigator`が行い、必要な画面へpropsとして渡す
-- 各画面(`TopScreen` / `SelectSendMoney` / `ProcessSendMoney` / `NextScreen`)は他の画面を直接importせず、`onBack`や`onSelectRecipient`などのコールバックをpropsで受け取り、遷移は`AppNavigator`に委ねる
+- 各画面は`onBack`や`onSelectRecipient`などのコールバックをpropsで受け取り、通常画面の遷移は`AppNavigator`に委ねる
 
 ```text
 index.js
-  └─ AuthProvider（トークン・ログイン状態を管理）
-       └─ AppNavigator
+  └─ BrowserRouter
+       └─ AuthProvider（トークン・ログイン状態を管理）
+          └─ AppNavigator
             ├─ 未ログイン                    → AuthScreen
             ├─ currentScreen === 'profile'    → TopScreen
             ├─ currentScreen === 'recipients' → SelectSendMoney
             ├─ currentScreen === 'transfer'   → ProcessSendMoney
-            └─ currentScreen === 'billing'    → NextScreen
+            ├─ currentScreen === 'invoice'    → MakeInvoiceLink
+            ├─ currentScreen === 'invoiceStatus' → InvoiceStatusScreen
+            └─ /invoice/:invoiceNumber        → ProcessPayment
 ```
 
 画面を追加する場合の手順:
@@ -359,6 +369,7 @@ index.js
 - `src/api/auth.js`: signup、login、logout、ログイン状態復元
 - `src/api/accounts.js`: 自分の口座概要、送金先一覧・詳細
 - `src/api/transfers.js`: 送金POST
+- `src/api/invoices.js`: 請求作成・一覧・詳細・支払い
 - `src/auth/AuthContext.js`: トークン保存とアプリ全体の認証状態
 - `src/auth/AuthScreen.js`: ログイン・新規登録フォーム
 - `src/navigation/AppNavigator.js`: 画面遷移の管理と口座情報の取得

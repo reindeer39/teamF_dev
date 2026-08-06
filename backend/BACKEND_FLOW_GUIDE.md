@@ -530,20 +530,20 @@ setSession(null);
 
 Djangoはサーバー側のTokenを削除し、ReactはlocalStorageとsessionを削除します。`session === null`になり、`AppNavigator`がログイン画面を表示します。
 
-## 11. 請求APIの現在位置
+## 11. 請求画面とAPIの連携
 
 Djangoには次の請求APIとSQLite連携があります。
 
 | 操作 | API | DB処理 |
 |---|---|---|
-| 請求作成 | `POST /api/user/{account}/invoice_request` | Invoiceを作成 |
-| 請求取得 | `GET /api/{invoice_number}/get_inf` | Invoiceを1件取得 |
-| 請求支払い | `POST /api/{invoice_number}/pay` | 残高、Transaction、Invoiceを一括更新 |
-| 請求一覧 | `GET /api/user/{account}/invoice_list` | 作成日時降順でInvoiceを取得 |
+| 請求作成 | `POST /api/invoices/` | ログイン口座を請求元としてInvoiceを作成 |
+| 請求取得 | `GET /api/invoices/{invoice_number}/` | UUIDからInvoiceを1件取得 |
+| 請求支払い | `POST /api/invoices/{invoice_number}/pay/` | ログイン口座の残高、Transaction、Invoiceを一括更新 |
+| 請求一覧 | `GET /api/invoices/` | ログイン口座が発行したInvoiceを作成日時降順で取得 |
 
-これらは`backend/api/views.py`の`InvoiceRequestView`、`InvoiceInfoView`、`InvoicePayView`、`InvoiceListView`です。
+Reactは`src/api/invoices.js`の`createInvoice()`、`getMyInvoices()`、`getInvoice()`、`payInvoice()`から共通`request()`を呼びます。Django側は`AuthenticatedInvoiceCollectionView`、`AuthenticatedInvoiceDetailView`、`AuthenticatedInvoicePayView`です。
 
-ただし、現在のReactで「請求する」を押した先は`NextScreen`であり、請求APIを呼ぶ`src/api/invoices.js`や`/invoice/{invoice_number}`画面はまだありません。つまり、請求はバックエンドAPIとDBまでは完成していますが、React画面との接続は今後の実装対象です。
+請求リンクはDjangoが保存後に返したInvoice UUIDを使うため、形式は`/invoice/{invoice_number}`です。支払者や請求元の口座番号はReactの固定値から送らず、認証トークンとInvoiceのDB値から確定します。
 
 ## 12. APIと画面の対応表
 
@@ -556,6 +556,10 @@ Djangoには次の請求APIとSQLite連携があります。
 | 送金先一覧 | `getRecipientList()` | `AuthenticatedRecipientListView` | Account |
 | 送金処理画面 | `getRecipientInfo()` | `AuthenticatedRecipientInfoView` | Account |
 | 送金ボタン | `createTransfer()` | `AuthenticatedTransferView` | Account, Transaction |
+| 請求リンク作成 | `createInvoice()` | `AuthenticatedInvoiceCollectionView` | Invoice |
+| 請求一覧 | `getMyInvoices()` | `AuthenticatedInvoiceCollectionView` | Invoice, Account |
+| 請求リンク表示 | `getInvoice()` | `AuthenticatedInvoiceDetailView` | Invoice, Account |
+| 請求支払い | `payInvoice()` | `AuthenticatedInvoicePayView` | Invoice, Account, Transaction |
 | ログアウト | `logout()` | `LogoutView` | Token |
 
 ## 13. 画面とAPIを実際に確認する方法

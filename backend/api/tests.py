@@ -1002,6 +1002,142 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(self.account.account_balance, 9250)
 
 
+class AuthenticatedInvoiceAPITests(APITestCase):
+    """React請求画面用APIが認証口座とInvoice DBを使用することを確認する。"""
+
+    def setUp(self):
+        self.issuer_user = User.objects.create_user(
+            username="invoice-issuer@example.com",
+            email="invoice-issuer@example.com",
+            password="strong-test-pass",
+        )
+        self.issuer = Account.objects.create(
+            account_number="4300001",
+            auth_user=self.issuer_user,
+            user_name="請求者",
+            account_balance=1000,
+        )
+        self.payer_user = User.objects.create_user(
+            username="invoice-payer@example.com",
+            email="invoice-payer@example.com",
+            password="strong-test-pass",
+        )
+        self.payer = Account.objects.create(
+            account_number="4300002",
+            auth_user=self.payer_user,
+            user_name="支払者",
+            account_balance=10000,
+        )
+
+    def authenticate(self, user):
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+    def test_authenticated_user_creates_invoice_for_own_account(self):
+        self.authenticate(self.issuer_user)
+
+        response = self.client.post(
+            "/api/invoices/",
+            {"invoice_amount": 2500, "message": "夕食代"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        invoice = Invoice.objects.get(invoice_number=response.data["invoice_number"])
+        self.assertEqual(invoice.account_number, self.issuer)
+        self.assertEqual(invoice.invoice_amount, 2500)
+        self.assertEqual(invoice.message, "夕食代")
+        self.assertEqual(
+            response.data["invoice_link"],
+            f"http://localhost:3000/invoice/{invoice.invoice_number}",
+        )
+
+    def test_invoice_collection_requires_authentication(self):
+        response = self.client.get("/api/invoices/")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_invoice_list_returns_only_logged_in_users_invoices(self):
+        mine = Invoice.objects.create(
+            invoice_amount=2500,
+            message="自分の請求",
+            account_number=self.issuer,
+        )
+        Invoice.objects.create(
+            invoice_amount=3000,
+            message="他人の請求",
+            account_number=self.payer,
+        )
+        self.authenticate(self.issuer_user)
+
+        response = self.client.get("/api/invoices/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["invoice_list"]), 1)
+        self.assertEqual(
+            response.data["invoice_list"][0]["invoice_number"], str(mine.invoice_number)
+        )
+        self.assertEqual(response.data["invoice_list"][0]["message"], "自分の請求")
+
+    def test_invoice_detail_uses_uuid_and_returns_database_data(self):
+        invoice = Invoice.objects.create(
+            invoice_amount=2500,
+            message="詳細確認",
+            account_number=self.issuer,
+        )
+        self.authenticate(self.payer_user)
+
+        response = self.client.get(f"/api/invoices/{invoice.invoice_number}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["invoice_amount"], 2500)
+        self.assertEqual(response.data["message"], "詳細確認")
+        self.assertEqual(response.data["issuer"]["account_number"], "4300001")
+
+    def test_payment_uses_logged_in_account_and_updates_all_database_records(self):
+        invoice = Invoice.objects.create(
+            invoice_amount=2500,
+            message="支払い確認",
+            account_number=self.issuer,
+        )
+        self.authenticate(self.payer_user)
+
+        response = self.client.post(
+            f"/api/invoices/{invoice.invoice_number}/pay/", {}, format="json"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        invoice.refresh_from_db()
+        self.issuer.refresh_from_db()
+        self.payer.refresh_from_db()
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.PAID)
+        self.assertEqual(invoice.paid_by, self.payer)
+        self.assertIsNotNone(invoice.paid_time)
+        self.assertIsNotNone(invoice.transaction_number)
+        self.assertEqual(invoice.transaction_number.sender, self.payer)
+        self.assertEqual(invoice.transaction_number.recipient, self.issuer)
+        self.assertEqual(self.payer.account_balance, 7500)
+        self.assertEqual(self.issuer.account_balance, 3500)
+        self.assertEqual(
+            response.data["transaction_number"],
+            str(invoice.transaction_number_id),
+        )
+
+    def test_issuer_cannot_pay_own_invoice(self):
+        invoice = Invoice.objects.create(
+            invoice_amount=500,
+            account_number=self.issuer,
+        )
+        self.authenticate(self.issuer_user)
+
+        response = self.client.post(
+            f"/api/invoices/{invoice.invoice_number}/pay/", {}, format="json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+
 class TransferAPITests(APITestCase):
     """HTTPリクエスト→View→ORM→テストDB→レスポンスの全経路を確認する。"""
     def setUp(self):

@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useMatch } from 'react-router-dom';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
-import NextScreen from '../NextScreen/NextScreen';
 import AuthScreen from '../auth/AuthScreen';
 import { useAuth } from '../auth/AuthContext';
 import { getMySummary } from '../api/accounts';
+import ProcessPayment from '../ProcessPayment/ProcessPayment';
+import MakeInvoiceLink from '../MakeInvoiceLink/MakeInvoiceLink';
+import CopyInvoiceLink from '../CopyInvoiceLink/CopyInvoiceLink';
+import InvoiceStatusScreen from '../InvoiceStatus/InvoiceStatusScreen';
+import { createInvoice } from '../api/invoices';
 
 function AppNavigator() {
   const { session, initializing, login, signup, signOut } = useAuth();
@@ -15,6 +20,9 @@ function AppNavigator() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
+  const [invoiceLink, setInvoiceLink] = useState('');
+
+  const invoiceMatch = useMatch('/invoice/:invoiceNumber');
 
   useEffect(() => {
     if (!session) {
@@ -51,6 +59,10 @@ function AppNavigator() {
     return <AuthScreen onLogin={login} onSignup={signup} />;
   }
 
+  if (invoiceMatch) {
+    return <ProcessPayment invoiceNumber={invoiceMatch.params.invoiceNumber} />;
+  }
+
   if (currentScreen === 'recipients') {
     return (
       <SelectSendMoney
@@ -78,8 +90,34 @@ function AppNavigator() {
     );
   }
 
-  if (currentScreen === 'billing') {
-    return <NextScreen onBack={() => setCurrentScreen('profile')} />;
+  if (currentScreen === 'invoice') {
+    return (
+      <MakeInvoiceLink
+        onBack={() => setCurrentScreen('profile')}
+        onCreate={async ({ amount, message }) => {
+          const result = await createInvoice(amount, message || '');
+          setInvoiceLink(result.invoice_link);
+          setCurrentScreen('copyInvoiceLink');
+        }}
+      />
+    );
+  }
+
+  if (currentScreen === 'copyInvoiceLink') {
+    return (
+      <CopyInvoiceLink
+        invoiceLink={invoiceLink}
+        onBack={() => setCurrentScreen('profile')}
+      />
+    );
+  }
+
+  if (currentScreen === 'invoiceStatus') {
+    return (
+      <InvoiceStatusScreen
+        onBack={() => setCurrentScreen('profile')}
+      />
+    );
   }
 
   return (
@@ -88,7 +126,8 @@ function AppNavigator() {
       loading={loading}
       error={error}
       onSelectRecipient={() => setCurrentScreen('recipients')}
-      onBilling={() => setCurrentScreen('billing')}
+      onInvoice={() => setCurrentScreen('invoice')}
+      onInvoiceStatus={() => setCurrentScreen('invoiceStatus')}
       onLogout={signOut}
     />
   );
