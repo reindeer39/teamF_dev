@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import recipientIcon from '../images/human2.png';
-import { createTransfer, getRecipientInfo } from '../api/users';
+import { getRecipientInfo } from '../api/accounts';
+import { createTransfer } from '../api/transfers';
 import './ProcessSendMoney.css';
 import NavigationButton from '../components/NavigationButton';
 
 function ProcessSendMoney({
-  senderAccountNumber,
   recipientAccountNumber,
   accountBalance,
   onBack,
@@ -23,7 +23,7 @@ function ProcessSendMoney({
     let active = true;
 
     // API連携ポイント: 選択した送金先と現在の送金可能残高をDBから取得する。
-    getRecipientInfo(senderAccountNumber, recipientAccountNumber)
+    getRecipientInfo(recipientAccountNumber)
       .then((data) => {
         if (active) setRecipient(data);
       })
@@ -37,7 +37,7 @@ function ProcessSendMoney({
     return () => {
       active = false;
     };
-  }, [senderAccountNumber, recipientAccountNumber]);
+  }, [recipientAccountNumber]);
 
   const currentBalance = recipient?.sender_account_balance ?? accountBalance;
   const numericAmount = Number(amount);
@@ -58,7 +58,6 @@ function ProcessSendMoney({
       // API連携ポイント: 送金ボタンでDjango APIを呼び、SQLiteの両口座残高と
       // Transaction履歴を1回の処理で更新する。
       const transferResult = await createTransfer(
-        senderAccountNumber,
         recipientAccountNumber,
         numericAmount,
         message

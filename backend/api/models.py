@@ -6,6 +6,7 @@ Viewや管理コマンドはSQLを直接書かず、各モデルを通じてDB�
 
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -16,6 +17,13 @@ class Account(models.Model):
 
     # 口座番号を主キーにするため、同じ番号のAccountは重複登録できない。
     account_number = models.CharField(max_length=20, primary_key=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="account",
+        null=True,
+        blank=True,
+    )
     user_icon = models.CharField(max_length=255, blank=True, default="")
     user_name = models.CharField(max_length=100)
     account_balance = models.PositiveBigIntegerField(default=0)

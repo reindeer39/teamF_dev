@@ -23,9 +23,9 @@ teamF_dev/
 │   ├── ProcessSendMoney/            # 画面: 送金処理
 │   ├── NextScreen/                  # 画面: 遷移確認用
 │   ├── components/                   # 共通UIパーツ
-│   ├── api/                           # Django APIを呼ぶ処理
+│   ├── auth/                          # 認証状態とログイン・新規登録画面
+│   ├── api/                           # 共通HTTPクライアントと機能別API
 │   ├── images/
-│   └── account.js                     # 開発用の固定ログイン口座番号
 ├── public/
 ├── package.json
 └── backend/        # バックエンド (Django)
@@ -67,6 +67,16 @@ python manage.py runserver
 ```
 
 `http://localhost:8000` で起動します。React 開発サーバー(`localhost:3000`)からのアクセスは CORS 許可済みです。
+
+モックデータ投入後は、次の開発用アカウントですぐにログインできます。
+
+| ログインID | パスワード | 口座番号 |
+|---|---|---|
+| `yamada` | `teamf-dev-pass` | `1000001` |
+| `sato` | `teamf-dev-pass` | `1000002` |
+| `suzuki` | `teamf-dev-pass` | `1000003` |
+
+これらはローカル開発専用です。本番環境では使用しないでください。ログイントークンはブラウザのlocalStorageへ保存されるため、ページを再読み込みしてもログイン状態が復元されます。
 
 ## 仕様書
 
@@ -307,13 +317,16 @@ python manage.py seed_mock_data --reset
 
 | Reactの操作 | API | データベース処理 |
 |---|---|---|
-| トップ画面を表示 | `GET /api/user/{account_number}/summary` | `accounts`からユーザー名・口座番号・残高を取得 |
-| 「送金する」を押す | `GET /api/user/{account_number}/recipient_list` | 送金元以外のAccountを取得 |
-| 送金先を選択 | `GET /api/user/{sender}/{recipient}/recipient` | 送金元残高と送金先情報を取得 |
-| 金額・メッセージを入力して「送金」を押す | `POST /api/user/{sender}/{recipient}/transfer` | 送金元残高を減算、送金先残高を加算、Transactionを作成 |
-| 送金完了後にトップへ戻る | `GET /api/user/{account_number}/summary` | 更新後の口座残高を再取得 |
+| 新規登録 | `POST /api/auth/signup` | Django UserとAccountを同時作成 |
+| ログイン | `POST /api/auth/login` | 認証トークンと口座情報を取得 |
+| ログイン状態を復元 | `GET /api/auth/me` | トークンに紐づくUserとAccountを取得 |
+| トップ画面を表示 | `GET /api/account/summary` | ログイン中の`accounts`を取得 |
+| 「送金する」を押す | `GET /api/account/recipients` | ログイン口座以外のAccountを取得 |
+| 送金先を選択 | `GET /api/account/recipients/{recipient}` | 送金先と送金可能残高を取得 |
+| 金額・メッセージを入力して「送金」を押す | `POST /api/transfers/{recipient}` | 認証ユーザーを送金元として残高更新とTransaction作成 |
+| ログアウト | `POST /api/auth/logout` | サーバーとブラウザのトークンを削除 |
 
-開発用のログイン口座番号は`src/account.js`の`ACCOUNT_NUMBER`で指定しています。現在は`mock_data.json`に存在する`1000001`を使用しています。ログイン機能を実装した後は、ここをログインユーザーの口座番号へ置き換えてください。
+固定の`src/account.js`は廃止しました。送金元口座はURLやReactの定数ではなく、AuthorizationヘッダーのトークンからDjangoが確定します。
 
 ### 画面遷移(ルーティング)の構成
 
@@ -325,11 +338,13 @@ python manage.py seed_mock_data --reset
 
 ```text
 index.js
-  └─ AppNavigator（currentScreen・account を管理）
-       ├─ currentScreen === 'profile'    → TopScreen
-       ├─ currentScreen === 'recipients' → SelectSendMoney
-       ├─ currentScreen === 'transfer'   → ProcessSendMoney
-       └─ currentScreen === 'billing'    → NextScreen
+  └─ AuthProvider（トークン・ログイン状態を管理）
+       └─ AppNavigator
+            ├─ 未ログイン                    → AuthScreen
+            ├─ currentScreen === 'profile'    → TopScreen
+            ├─ currentScreen === 'recipients' → SelectSendMoney
+            ├─ currentScreen === 'transfer'   → ProcessSendMoney
+            └─ currentScreen === 'billing'    → NextScreen
 ```
 
 画面を追加する場合の手順:
@@ -340,7 +355,12 @@ index.js
 
 ### API連携コードの場所
 
-- `src/api/users.js`: ReactからDjango APIを呼ぶ処理を集約
+- `src/api/client.js`: ベースURL、JSON処理、Authorizationヘッダー、共通エラー処理
+- `src/api/auth.js`: signup、login、logout、ログイン状態復元
+- `src/api/accounts.js`: 自分の口座概要、送金先一覧・詳細
+- `src/api/transfers.js`: 送金POST
+- `src/auth/AuthContext.js`: トークン保存とアプリ全体の認証状態
+- `src/auth/AuthScreen.js`: ログイン・新規登録フォーム
 - `src/navigation/AppNavigator.js`: 画面遷移の管理と口座情報の取得
 - `src/TopScreen/TopScreen.js`: トップ画面(プロフィール)の表示
 - `src/SelectSendMoney/SelectSendMoney.js`: 送金先一覧の取得
@@ -389,8 +409,14 @@ REACT_APP_API_BASE_URL=http://127.0.0.1:8000/api npm start
 Django API単体は次のコマンドで確認できます。
 
 ```bash
-curl http://127.0.0.1:8000/api/user/1000001/summary
-curl http://127.0.0.1:8000/api/user/1000001/recipient_list
+TOKEN=$(curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"username":"yamada","password":"teamf-dev-pass"}' \
+  http://127.0.0.1:8000/api/auth/login | python -c \
+  'import json,sys; print(json.load(sys.stdin)["token"])')
+
+curl -H "Authorization: Token $TOKEN" \
+  http://127.0.0.1:8000/api/account/summary
 ```
 
 送金POSTはDBの残高と履歴を実際に変更します。開発用データであることを確認してから実行してください。
@@ -398,8 +424,9 @@ curl http://127.0.0.1:8000/api/user/1000001/recipient_list
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
+  -H "Authorization: Token $TOKEN" \
   -d '{"transfer_amount":1000,"message":"API確認"}' \
-  http://127.0.0.1:8000/api/user/1000001/1000002/transfer
+  http://127.0.0.1:8000/api/transfers/1000002
 ```
 
 実行後、Django管理画面で両口座の残高とTransaction履歴を確認できます。自動テストではテスト専用DBを使うため、ローカルの`db.sqlite3`を変更せずに連携を確認できます。

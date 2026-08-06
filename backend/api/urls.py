@@ -7,17 +7,45 @@ config/urls.pyが`/api/`を取り除いた残りのURLをこのファイルへ�
 from django.urls import path
 
 from api.views import (
+    AuthenticatedRecipientInfoView,
+    AuthenticatedRecipientListView,
+    AuthenticatedTransferView,
+    CurrentUserView,
     InvoiceInfoView,
     InvoiceListView,
     InvoicePayView,
     InvoiceRequestView,
+    LoginView,
+    LogoutView,
+    MyAccountSummaryView,
     RecipientInfoView,
     RecipientListView,
+    SignupView,
     TransferView,
     UserSummaryView,
 )
 
 urlpatterns = [
+    path("auth/signup", SignupView.as_view(), name="signup"),
+    path("auth/login", LoginView.as_view(), name="login"),
+    path("auth/logout", LogoutView.as_view(), name="logout"),
+    path("auth/me", CurrentUserView.as_view(), name="current-user"),
+    path("account/summary", MyAccountSummaryView.as_view(), name="my-summary"),
+    path(
+        "account/recipients",
+        AuthenticatedRecipientListView.as_view(),
+        name="authenticated-recipient-list",
+    ),
+    path(
+        "account/recipients/<str:recipient_account_number>",
+        AuthenticatedRecipientInfoView.as_view(),
+        name="authenticated-recipient-info",
+    ),
+    path(
+        "transfers/<str:recipient_account_number>",
+        AuthenticatedTransferView.as_view(),
+        name="authenticated-transfer",
+    ),
     # GET /api/user/1000001/summary → UserSummaryView.get(..., "1000001")
     path(
         "user/<str:account_number>/summary",
