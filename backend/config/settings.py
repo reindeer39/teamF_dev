@@ -60,6 +60,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
 ]
 
+# 請求リンクの生成先。環境別に変更する場合はこの値を上書きする。
+FRONTEND_BASE_URL = "http://localhost:3000"
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [

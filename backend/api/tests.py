@@ -7,6 +7,7 @@
 import json
 import tempfile
 import uuid
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -507,6 +508,209 @@ class SeedMockDataCommandTests(TestCase):
             "55555555-5555-4555-8555-555555555555）.invoice_amount",
         ):
             self._seed(data)
+
+
+class InvoiceAPITests(APITestCase):
+    """請求の作成・取得・支払い・一覧がSQLiteと連携することを確認する。"""
+
+    def setUp(self):
+        self.issuer = Account.objects.create(
+            account_number="5000001",
+            user_name="請求元",
+            account_balance=1000,
+        )
+        self.payer = Account.objects.create(
+            account_number="5000002",
+            user_name="支払元",
+            account_balance=10000,
+        )
+
+    def _create_invoice(self, amount=3000, message="会食代"):
+        return Invoice.objects.create(
+            invoice_amount=amount,
+            message=message,
+            account_number=self.issuer,
+        )
+
+    def _payment_data(self, invoice, **overrides):
+        data = {
+            "my_account_number": self.payer.account_number,
+            "invoice_account_number": self.issuer.account_number,
+            "invoice_amount": str(invoice.invoice_amount),
+            "message": "請求支払い",
+        }
+        data.update(overrides)
+        return data
+
+    def test_invoice_request_creates_database_record_and_link(self):
+        response = self.client.post(
+            "/api/user/5000001/invoice_request",
+            {"invoice_amount": 2500, "message": "夕食代"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        invoice = Invoice.objects.get()
+        self.assertEqual(invoice.invoice_amount, 2500)
+        self.assertEqual(invoice.message, "夕食代")
+        self.assertEqual(invoice.account_number, self.issuer)
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.NOTPAY)
+        self.assertIsNotNone(invoice.created_time)
+        self.assertEqual(
+            response.data["invoice_link"],
+            f"http://localhost:3000/invoice/{invoice.invoice_number}",
+        )
+
+    def test_invoice_request_rejects_invalid_amount(self):
+        for amount in (0, -1, "3000"):
+            with self.subTest(amount=amount):
+                response = self.client.post(
+                    "/api/user/5000001/invoice_request",
+                    {"invoice_amount": amount},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+        self.assertEqual(Invoice.objects.count(), 0)
+
+    def test_invoice_info_reads_database_record(self):
+        invoice = self._create_invoice()
+
+        response = self.client.get(f"/api/{invoice.invoice_number}/get_inf")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["invoice_account_number"], "5000001")
+        self.assertEqual(response.data["invoice_amount"], "3000")
+        self.assertEqual(response.data["invoice_message"], "会食代")
+        self.assertEqual(response.data["invoice_flag"], "notpay")
+
+    def test_invoice_info_rejects_invalid_uuid(self):
+        response = self.client.get("/api/not-a-uuid/get_inf")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_invoice_payment_updates_all_related_records_atomically(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.issuer.refresh_from_db()
+        self.payer.refresh_from_db()
+        invoice.refresh_from_db()
+        transfer = Transaction.objects.get()
+        self.assertEqual(self.issuer.account_balance, 4000)
+        self.assertEqual(self.payer.account_balance, 7000)
+        self.assertEqual(transfer.sender, self.payer)
+        self.assertEqual(transfer.recipient, self.issuer)
+        self.assertEqual(transfer.transfer_amount, 3000)
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.PAID)
+        self.assertEqual(invoice.paid_by, self.payer)
+        self.assertEqual(invoice.transaction_number, transfer)
+        self.assertEqual(invoice.paid_time, transfer.created_at)
+
+    def test_invoice_payment_rejects_tampered_amount_without_changes(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice, invoice_amount="1"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+        self.payer.refresh_from_db()
+        self.assertEqual(self.payer.account_balance, 10000)
+
+    def test_invoice_payment_rejects_tampered_issuer_without_changes(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice, invoice_account_number="5000002"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_paid_invoice_cannot_be_paid_twice(self):
+        invoice = self._create_invoice()
+        payment_data = self._payment_data(invoice)
+        self.client.post(
+            f"/api/{invoice.invoice_number}/pay", payment_data, format="json"
+        )
+
+        second_response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay", payment_data, format="json"
+        )
+
+        self.assertEqual(second_response.status_code, 409)
+        self.assertEqual(Transaction.objects.count(), 1)
+
+    def test_invoice_payment_rejects_insufficient_balance(self):
+        invoice = self._create_invoice(amount=10001)
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.NOTPAY)
+
+    def test_invoice_payment_rejects_missing_invoice(self):
+        missing_invoice_number = uuid.uuid4()
+        response = self.client.post(
+            f"/api/{missing_invoice_number}/pay",
+            {
+                "my_account_number": "5000002",
+                "invoice_account_number": "5000001",
+                "invoice_amount": "3000",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_invoice_payment_rejects_issuer_as_payer(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice, my_account_number="5000001"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_invoice_list_reads_database_in_newest_first_order(self):
+        older = self._create_invoice(message="古い請求")
+        newer = self._create_invoice(message="新しい請求")
+        Invoice.objects.filter(pk=older.pk).update(
+            created_time=timezone.now() - timedelta(days=1)
+        )
+
+        response = self.client.get("/api/user/5000001/invoice_list")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["invoice_number"] for item in response.data["invoice_list"]],
+            [str(newer.invoice_number), str(older.invoice_number)],
+        )
+        self.assertRegex(
+            response.data["invoice_list"][0]["invoice_time"],
+            r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$",
+        )
 
 
 class TransferAPITests(APITestCase):
