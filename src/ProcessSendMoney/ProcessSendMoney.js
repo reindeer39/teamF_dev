@@ -3,12 +3,12 @@ import recipientIcon from '../images/human2.png';
 import { createTransfer, getRecipientInfo } from '../api/users';
 import './ProcessSendMoney.css';
 import NavigationButton from '../components/NavigationButton';
+import MessageInput from '../components/MessageInput';
 
 function ProcessSendMoney({
   senderAccountNumber,
   recipientAccountNumber,
   accountBalance,
-  onBack,
   onTransferComplete,
 }) {
   const [recipient, setRecipient] = useState(null);
@@ -86,8 +86,6 @@ function ProcessSendMoney({
 
   return (
     <form className="send-money-screen" onSubmit={handleSubmit}>
-      <button type="button" className="text-button" onClick={onBack}>戻る</button>
-
       <section className="recipient-section">
         <p className="section-label">送金先</p>
         <div className="recipient-info">
@@ -122,11 +120,10 @@ function ProcessSendMoney({
       </section>
 
       <section className="message-section">
-        <label className="section-label" htmlFor="transfer-message">メッセージ（任意）</label>
-        <textarea
+        <MessageInput
           id="transfer-message"
-          className="message-input"
-          maxLength="200"
+          label="メッセージ（任意）"
+          maxLength={200}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="例：昼食代"

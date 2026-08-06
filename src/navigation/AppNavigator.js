@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useRoutes } from 'react-router';
+import { useNavigate, useRoutes } from 'react-router';
+import AppLayout from '../components/AppLayout';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
@@ -11,6 +12,7 @@ import { ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 
 function AppNavigator() {
+  const navigate = useNavigate();
   const [currentScreen, setCurrentScreen] = useState('profile');
   const [account, setAccount] = useState(null);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
@@ -49,42 +51,48 @@ function AppNavigator() {
   }, [reloadCount]);
 
   if (invoiceScreen) {
-    return invoiceScreen;
+    return (
+      <AppLayout title="支払い" onBack={() => navigate('/')}>
+        {invoiceScreen}
+      </AppLayout>
+    );
   }
 
   if (currentScreen === 'recipients') {
     return (
+      <AppLayout title="送金先一覧" onBack={() => setCurrentScreen('profile')}>
       <SelectSendMoney
         senderAccountNumber={ACCOUNT_NUMBER}
-        onBack={() => setCurrentScreen('profile')}
         onSelectRecipient={(recipient) => {
           setSelectedRecipient(recipient);
           setCurrentScreen('transfer');
         }}
       />
+      </AppLayout>
     );
   }
 
   if (currentScreen === 'transfer' && selectedRecipient) {
     return (
+      <AppLayout title="送金" onBack={() => setCurrentScreen('recipients')}>
       <ProcessSendMoney
         senderAccountNumber={ACCOUNT_NUMBER}
         recipientAccountNumber={selectedRecipient.account_number}
         accountBalance={account?.account_balance || 0}
-        onBack={() => setCurrentScreen('recipients')}
         onTransferComplete={() => {
           setSelectedRecipient(null);
           setCurrentScreen('profile');
           setReloadCount((count) => count + 1);
         }}
       />
+      </AppLayout>
     );
   }
 
   if (currentScreen === 'invoice') {
     return (
+      <AppLayout title="請求" onBack={() => setCurrentScreen('profile')}>
       <MakeInvoiceLink
-        onBack={() => setCurrentScreen('profile')}
         onCreate={({ amount, message }) => {
           const query = new URLSearchParams({ amount: String(amount) });
           if (message) query.set('message', message);
@@ -92,27 +100,31 @@ function AppNavigator() {
           setCurrentScreen('copyInvoiceLink');
         }}
       />
+      </AppLayout>
     );
   }
 
   if (currentScreen === 'copyInvoiceLink') {
     return (
+      <AppLayout title="請求リンク" onBack={() => setCurrentScreen('profile')}>
       <CopyInvoiceLink
         invoiceLink={invoiceLink}
         onBack={() => setCurrentScreen('profile')}
       />
+      </AppLayout>
     );
   }
 
   if (currentScreen === 'invoiceStatus') {
     return (
-      <InvoiceStatusScreen
-        onBack={() => setCurrentScreen('profile')}
-      />
+      <AppLayout title="請求状態確認" onBack={() => setCurrentScreen('profile')}>
+      <InvoiceStatusScreen />
+      </AppLayout>
     );
   }
 
   return (
+    <AppLayout title="トップ">
     <TopScreen
       account={account}
       loading={loading}
@@ -121,6 +133,7 @@ function AppNavigator() {
       onInvoice={() => setCurrentScreen('invoice')}
       onInvoiceStatus={() => setCurrentScreen('invoiceStatus')}
     />
+    </AppLayout>
   );
 }
 

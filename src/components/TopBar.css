@@ -1,0 +1,31 @@
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: clamp(48px, 10vw, 72px) 1fr clamp(48px, 10vw, 72px);
+  align-items: center;
+  width: 100%;
+  height: var(--app-top-bar-height);
+  flex: 0 0 var(--app-top-bar-height);
+  box-sizing: border-box;
+  border-bottom: 1px solid #8d9bb3;
+  background-color: var(--app-top-bar-color);
+}
+
+.top-bar__side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.top-bar__title {
+  margin: 0;
+  overflow: hidden;
+  color: var(--app-text-color);
+  font-size: clamp(1.15rem, 4.5vw, 1.5rem);
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

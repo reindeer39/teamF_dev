@@ -1,0 +1,16 @@
+.app-layout {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background-color: var(--app-background-color);
+}
+
+.app-layout__content {
+  flex: 1;
+  min-height: 0;
+}
+
+.app-layout__content > main,
+.app-layout__content > form {
+  min-height: calc(100dvh - var(--app-top-bar-height));
+}

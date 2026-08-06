@@ -4,7 +4,7 @@
   margin: 0 auto;
   padding: 56px 28px 32px;
   box-sizing: border-box;
-  background-color: #f8f8f8;
+  background-color: var(--app-background-color);
   color: #222;
 }
 
@@ -53,17 +53,6 @@
 
 .message-section {
   margin-bottom: 32px;
-}
-
-.message-input {
-  width: 100%;
-  min-height: 96px;
-  padding: 12px;
-  border: 1px solid #bbbbbb;
-  border-radius: 12px;
-  box-sizing: border-box;
-  font: inherit;
-  resize: vertical;
 }
 
 .amount-input-wrapper {

@@ -7,7 +7,7 @@
   align-items: center;
   gap: clamp(12px, 3vmin, 24px);
   padding: clamp(12px, 3vh, 24px) 0;
-  background-color: #f5f5f5;
+  background-color: var(--app-background-color);
   color: #222222;
 }
 
@@ -28,27 +28,7 @@
 }
 
 .invoice-back-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 5vh;
-  height: 5vh;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #222222;
-  font-size: clamp(2rem, 6vmin, 2.5rem);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.invoice-back-button:hover {
-  color: #666666;
-}
-
-.invoice-back-button:focus-visible {
-  outline: 2px solid #316745;
-  outline-offset: 2px;
+  justify-self: start;
 }
 
 .invoice-status-panel {
@@ -56,7 +36,7 @@
   max-width: 80vh;
   box-sizing: border-box;
   padding: clamp(12px, 3vmin, 24px);
-  background-color: #f5f5f5;
+  background-color: var(--app-background-color);
 }
 
 .invoice-status-title {
@@ -222,25 +202,8 @@
 }
 
 /* ===== メッセージ ===== */
-.invoice-message-label {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(6px, 1vmin, 10px);
-  font-size: clamp(1rem, 4vw, 1.25rem);
-  font-weight: 600;
-}
-
-.invoice-message-label textarea {
+.invoice-message-input .message-input-field__textarea {
   height: clamp(60px, 10vh, 100px);
-  box-sizing: border-box;
-  padding: clamp(8px, 1.5vmin, 14px);
-  border: 1px solid #888888;
-  border-radius: 0;
-  overflow-y: auto;
-  resize: none;
-  background-color: #f5f5f5;
-  color: #222222;
-  font: inherit;
 }
 
 /* ===== スマートフォン ===== */

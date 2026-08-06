@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import NavigationButton from '../components/NavigationButton';
+import MessageInput from '../components/MessageInput';
 import './MakeInvoiceLink.css';
 
-function MakeInvoiceLink({ onBack = () => {}, onCreate = () => {} }) {
+function MakeInvoiceLink({ onCreate = () => {} }) {
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
 
@@ -21,14 +22,6 @@ function MakeInvoiceLink({ onBack = () => {}, onCreate = () => {} }) {
 
   return (
     <form className="make-invoice-link" onSubmit={handleSubmit}>
-      <button
-        type="button"
-        className="make-invoice-link__back"
-        onClick={onBack}
-      >
-        戻る
-      </button>
-
       <label className="make-invoice-link__amount" htmlFor="invoice-amount">
         <span>請求金額</span>
         <div className="make-invoice-link__amount-box">
@@ -47,16 +40,14 @@ function MakeInvoiceLink({ onBack = () => {}, onCreate = () => {} }) {
         </div>
       </label>
 
-      <label className="make-invoice-link__message" htmlFor="invoice-message">
-        <span>メッセージ入力</span>
-        <textarea
-          id="invoice-message"
-          aria-label="メッセージ（任意）"
-          placeholder="ランチ代をお願いします"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-        />
-      </label>
+      <MessageInput
+        id="invoice-message"
+        className="make-invoice-link__message"
+        label="メッセージ（任意）"
+        placeholder="例：ランチ代をお願いします"
+        value={message}
+        onChange={(event) => setMessage(event.target.value)}
+      />
 
       <div className="make-invoice-link__submit">
         <NavigationButton onClick={handleSubmit} disabled={!canCreate}>

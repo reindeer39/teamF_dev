@@ -2,19 +2,13 @@
   position: relative;
   min-height: 100vh;
   box-sizing: border-box;
-  background-color: #f5f5f5;
+  background-color: var(--app-background-color);
 }
 
 .make-invoice-link__back {
   position: absolute;
   top: 20px;
   left: 20px;
-  padding: 8px 12px;
-  border: 0;
-  background: transparent;
-  color: #316745;
-  font-size: 16px;
-  cursor: pointer;
 }
 
 .make-invoice-link__amount,
@@ -32,6 +26,7 @@
 
 .make-invoice-link__message {
   top: min(70vh, 591px);
+  width: min(70vw, 420px);
 }
 
 .make-invoice-link__amount > span,
@@ -72,19 +67,6 @@
 .make-invoice-link__amount-box span {
   padding-right: 14px;
   color: #333333;
-}
-
-.make-invoice-link__message textarea {
-  width: 100%;
-  height: 100px;
-  box-sizing: border-box;
-  padding: 12px;
-  border: 1px solid #999999;
-  border-radius: 8px;
-  outline: none;
-  background-color: #ffffff;
-  font: inherit;
-  resize: none;
 }
 
 .make-invoice-link__submit {

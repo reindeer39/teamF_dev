@@ -1,0 +1,37 @@
+.message-input-field {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: clamp(6px, 1vmin, 10px);
+  box-sizing: border-box;
+}
+
+.message-input-field__label {
+  color: var(--app-text-color);
+  font-size: clamp(1rem, 2.5vmin, 1.125rem);
+}
+
+.message-input-field__textarea {
+  width: 100%;
+  height: clamp(80px, 12vh, 110px);
+  box-sizing: border-box;
+  padding: clamp(10px, 1.5vmin, 14px);
+  border: 1px solid var(--app-border-color);
+  border-radius: 10px;
+  outline: none;
+  overflow-y: auto;
+  resize: none;
+  background-color: var(--app-surface-color);
+  color: var(--app-text-color);
+  font: inherit;
+  line-height: 1.5;
+}
+
+.message-input-field__textarea:focus {
+  border-color: var(--app-primary-color);
+  box-shadow: 0 0 0 2px rgb(49 103 69 / 15%);
+}
+
+.message-input-field__textarea[readonly] {
+  background-color: var(--app-background-color);
+}

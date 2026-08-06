@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getUserSummary } from '../api/users';
 import human1 from '../images/human1.png';
+import MessageInput from '../components/MessageInput';
 import './InvoiceStatusScreen.css';
 
 const USER_ICONS = {
@@ -45,7 +46,7 @@ function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
 }
 
-function InvoiceStatusScreen({ onBack }) {
+function InvoiceStatusScreen() {
   const [openInvoiceNumber, setOpenInvoiceNumber] = useState(null);
   const [payer, setPayer] = useState(null);
   const [payerLoading, setPayerLoading] = useState(false);
@@ -112,18 +113,6 @@ function InvoiceStatusScreen({ onBack }) {
   return (
     <main className="invoice-status-screen">
       <section className="invoice-status-panel">
-        <header className="invoice-status-header">
-          <button
-            className="invoice-back-button"
-            type="button"
-            aria-label="前の画面に戻る"
-            onClick={onBack}
-          >
-            &lt;
-          </button>
-          <h1 className="invoice-status-title">請求リスト</h1>
-        </header>
-
         <div className="invoice-list">
           {INVOICE_REQUESTS.map((invoice) => {
             const invoiceNumber = invoice.invoice_number;
@@ -212,10 +201,13 @@ function InvoiceStatusScreen({ onBack }) {
                           )}
                         </div>
 
-                        <label className="invoice-message-label">
-                          メッセージ
-                          <textarea value={invoiceInfo.message || ''} readOnly />
-                        </label>
+                        <MessageInput
+                          id={`invoice-message-${invoiceNumber}`}
+                          className="invoice-message-input"
+                          label="メッセージ"
+                          value={invoiceInfo.message || ''}
+                          readOnly
+                        />
                       </>
                     ) : (
                       <p className="invoice-list-message--error">

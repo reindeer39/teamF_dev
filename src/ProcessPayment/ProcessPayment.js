@@ -6,6 +6,7 @@ import {
 
 import requesterDefaultIcon from '../images/human2.png';
 import NavigationButton from '../components/NavigationButton';
+import MessageInput from '../components/MessageInput';
 import { PAYMENT_ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 import './ProcessPayment.css';
@@ -24,7 +25,6 @@ function ProcessPayment({
   billingAmount = 0,
   message = '',
   onPayment,
-  onBack,
 }) {
   // URLの /invoice/:invoiceNumber から請求番号を取得する
   const { invoiceNumber } = useParams();
@@ -188,16 +188,6 @@ function ProcessPayment({
   // 支払い前の通常画面
   return (
     <main className="payment-screen">
-      {onBack && (
-        <button
-          type="button"
-          className="text-button payment-screen__back"
-          onClick={onBack}
-        >
-          戻る
-        </button>
-      )}
-
       <section
         className="payment-screen__section"
         aria-labelledby="requester-label"
@@ -245,15 +235,13 @@ function ProcessPayment({
           </p>
         </div>
 
-        <div className="payment-screen__message-block">
-          <p className="payment-screen__label">
-            メッセージ
-          </p>
-
-          <p className="payment-screen__message">
-            {message || 'メッセージはありません'}
-          </p>
-        </div>
+        <MessageInput
+          id="payment-message"
+          className="payment-screen__message-block"
+          label="メッセージ"
+          value={message || 'メッセージはありません'}
+          readOnly
+        />
       </section>
 
       {error && (
