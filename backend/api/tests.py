@@ -301,6 +301,7 @@ class SeedMockDataCommandTests(TestCase):
                 {
                     "account_number": "3000001",
                     "login_username": "developer1",
+                    "login_email": "developer1@example.com",
                     "login_password": "teamf-test-pass",
                     "user_icon": "/icons/a.png",
                     "user_name": "開発一郎",
@@ -309,6 +310,7 @@ class SeedMockDataCommandTests(TestCase):
                 {
                     "account_number": "3000002",
                     "login_username": "developer2",
+                    "login_email": "developer2@example.com",
                     "login_password": "teamf-test-pass",
                     "user_icon": "/icons/b.png",
                     "user_name": "開発花子",
@@ -370,6 +372,10 @@ class SeedMockDataCommandTests(TestCase):
         self.assertTrue(User.objects.get(username="developer1").check_password(
             "teamf-test-pass"
         ))
+        self.assertEqual(
+            User.objects.get(username="developer1").email,
+            "developer1@example.com",
+        )
         self.assertIn("Account：新規2件，更新0件", output)
         self.assertIn("Transaction：新規1件，更新0件", output)
         self.assertIn("Invoice：新規2件，更新0件", output)
@@ -729,7 +735,9 @@ class AuthenticationAPITests(APITestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(
-            username="login-user", password="strong-test-pass"
+            username="login-user",
+            email="login@example.com",
+            password="strong-test-pass",
         )
         self.account = Account.objects.create(
             account_number="4100001",
@@ -752,27 +760,27 @@ class AuthenticationAPITests(APITestCase):
         response = self.client.post(
             "/api/auth/signup",
             {
-                "username": "new-user",
+                "email": "new-user@example.com",
                 "password": "Correct-Horse-57!",
                 "user_name": "新規利用者",
-                "email": "new@example.com",
             },
             format="json",
         )
 
         self.assertEqual(response.status_code, 201)
-        created_user = User.objects.get(username="new-user")
+        created_user = User.objects.get(email="new-user@example.com")
         self.assertTrue(created_user.check_password("Correct-Horse-57!"))
         self.assertEqual(created_user.account.user_name, "新規利用者")
         self.assertEqual(created_user.account.account_balance, 0)
         self.assertEqual(len(created_user.account.account_number), 7)
         self.assertEqual(response.data["token"], created_user.auth_token.key)
+        self.assertEqual(response.data["email"], "new-user@example.com")
 
-    def test_signup_rejects_duplicate_username_without_creating_account(self):
+    def test_signup_rejects_duplicate_email_without_creating_account(self):
         response = self.client.post(
             "/api/auth/signup",
             {
-                "username": "login-user",
+                "email": "LOGIN@example.com",
                 "password": "another-strong-pass",
                 "user_name": "重複利用者",
             },
@@ -780,29 +788,60 @@ class AuthenticationAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("username", response.data["errors"])
+        self.assertIn("email", response.data["errors"])
         self.assertEqual(Account.objects.count(), 2)
 
     def test_login_returns_token_and_account(self):
         response = self.client.post(
             "/api/auth/login",
-            {"username": "login-user", "password": "strong-test-pass"},
+            {"email": "LOGIN@example.com", "password": "strong-test-pass"},
             format="json",
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["account"]["account_number"], "4100001")
+        self.assertEqual(response.data["email"], "login@example.com")
         self.assertTrue(Token.objects.filter(key=response.data["token"]).exists())
 
-    def test_login_rejects_invalid_password(self):
+    def test_login_failure_does_not_reveal_invalid_field(self):
+        wrong_password_response = self.client.post(
+            "/api/auth/login",
+            {"email": "login@example.com", "password": "wrong-password"},
+            format="json",
+        )
+        unknown_email_response = self.client.post(
+            "/api/auth/login",
+            {"email": "unknown@example.com", "password": "strong-test-pass"},
+            format="json",
+        )
+
+        self.assertEqual(wrong_password_response.status_code, 400)
+        self.assertEqual(unknown_email_response.status_code, 400)
+        self.assertEqual(wrong_password_response.data, unknown_email_response.data)
+        self.assertEqual(
+            wrong_password_response.data["error"],
+            "メールアドレスまたはパスワードが正しくありません。",
+        )
+        self.assertEqual(Token.objects.count(), 0)
+
+    def test_login_without_linked_account_uses_same_generic_error(self):
+        User.objects.create_user(
+            username="no-account",
+            email="no-account@example.com",
+            password="strong-test-pass",
+        )
+
         response = self.client.post(
             "/api/auth/login",
-            {"username": "login-user", "password": "wrong-password"},
+            {"email": "no-account@example.com", "password": "strong-test-pass"},
             format="json",
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(Token.objects.count(), 0)
+        self.assertEqual(
+            response.data["error"],
+            "メールアドレスまたはパスワードが正しくありません。",
+        )
 
     def test_current_user_requires_authentication(self):
         response = self.client.get("/api/auth/me")
@@ -815,7 +854,7 @@ class AuthenticationAPITests(APITestCase):
         response = self.client.get("/api/auth/me")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["username"], "login-user")
+        self.assertEqual(response.data["email"], "login@example.com")
         self.assertEqual(response.data["account"]["account_number"], "4100001")
 
     def test_logout_invalidates_token(self):

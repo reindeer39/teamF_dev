@@ -18,7 +18,7 @@ const summary = {
 beforeEach(() => {
   jest.clearAllMocks();
   useAuth.mockReturnValue({
-    session: { username: 'yamada', account: summary },
+    session: { email: 'yamada@example.com', account: summary },
     initializing: false,
     login: jest.fn(),
     signup: jest.fn(),
@@ -102,6 +102,6 @@ test('未ログイン時はログイン画面を表示する', () => {
   render(<AppNavigator />);
 
   expect(screen.getByRole('heading', { name: 'ログイン' })).toBeInTheDocument();
-  expect(screen.getByLabelText('ログインID')).toBeInTheDocument();
+  expect(screen.getByLabelText('メールアドレス')).toBeInTheDocument();
   expect(screen.getByLabelText('パスワード')).toBeInTheDocument();
 });

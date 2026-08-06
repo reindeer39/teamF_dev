@@ -5,7 +5,7 @@ import { getCurrentUser, login, logout, signup } from '../api/auth';
 jest.mock('../api/auth');
 
 const sessionResponse = {
-  username: 'yamada',
+  email: 'yamada@example.com',
   account: {
     account_number: '1000001',
     user_name: '山田太郎',
@@ -20,7 +20,7 @@ function AuthProbe() {
   return (
     <button
       type="button"
-      onClick={() => auth.login({ username: 'yamada', password: 'password' })}
+      onClick={() => auth.login({ email: 'yamada@example.com', password: 'password' })}
     >
       テストログイン
     </button>

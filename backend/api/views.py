@@ -57,21 +57,24 @@ class SignupView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        raw_username = request.data.get("username", "")
         raw_user_name = request.data.get("user_name", "")
         raw_email = request.data.get("email", "")
-        username = raw_username.strip() if isinstance(raw_username, str) else ""
         password = request.data.get("password", "")
         user_name = raw_user_name.strip() if isinstance(raw_user_name, str) else ""
-        email = raw_email.strip() if isinstance(raw_email, str) else ""
+        email = raw_email.strip().lower() if isinstance(raw_email, str) else ""
 
         errors = {}
-        if not username:
-            errors["username"] = ["ログインIDを入力してください。"]
-        elif len(username) > User._meta.get_field("username").max_length:
-            errors["username"] = ["ログインIDが長すぎます。"]
-        elif User.objects.filter(username=username).exists():
-            errors["username"] = ["このログインIDは既に使用されています。"]
+        if not email:
+            errors["email"] = ["メールアドレスを入力してください。"]
+        elif len(email) > User._meta.get_field("username").max_length:
+            errors["email"] = ["メールアドレスが長すぎます。"]
+        else:
+            try:
+                validate_email(email)
+            except ValidationError:
+                errors["email"] = ["メールアドレスの形式が正しくありません。"]
+            if User.objects.filter(email__iexact=email).exists():
+                errors["email"] = ["このメールアドレスは既に使用されています。"]
         if not user_name:
             errors["user_name"] = ["表示名を入力してください。"]
         elif len(user_name) > 100:
@@ -80,23 +83,16 @@ class SignupView(APIView):
             errors["password"] = ["パスワードを入力してください。"]
         else:
             try:
-                validate_password(password, user=User(username=username, email=email))
+                validate_password(password, user=User(username=email, email=email))
             except ValidationError as exc:
                 errors["password"] = list(exc.messages)
-        if raw_email and not isinstance(raw_email, str):
-            errors["email"] = ["メールアドレスの形式が正しくありません。"]
-        elif email:
-            try:
-                validate_email(email)
-            except ValidationError:
-                errors["email"] = ["メールアドレスの形式が正しくありません。"]
         if errors:
             return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             with transaction.atomic():
                 user = User.objects.create_user(
-                    username=username,
+                    username=email,
                     password=password,
                     email=email,
                 )
@@ -116,7 +112,7 @@ class SignupView(APIView):
         return Response(
             {
                 "token": token.key,
-                "username": user.username,
+                "email": user.email,
                 "account": account_data(account),
             },
             status=status.HTTP_201_CREATED,
@@ -124,31 +120,40 @@ class SignupView(APIView):
 
 
 class LoginView(APIView):
-    """ログインIDとパスワードを検証して永続トークンを返す。"""
+    """メールアドレスとパスワードを検証して永続トークンを返す。"""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        username = request.data.get("username", "")
+        raw_email = request.data.get("email", "")
+        email = raw_email.strip().lower() if isinstance(raw_email, str) else ""
         password = request.data.get("password", "")
-        user = authenticate(request=request, username=username, password=password)
+        user_by_email = (
+            User.objects.filter(email__iexact=email).first() if email else None
+        )
+        authentication_name = user_by_email.username if user_by_email else email
+        user = authenticate(
+            request=request,
+            username=authentication_name,
+            password=password,
+        )
         if user is None:
             return Response(
-                {"error": "ログインIDまたはパスワードが正しくありません。"},
+                {"error": "メールアドレスまたはパスワードが正しくありません。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
             account = user.account
         except Account.DoesNotExist:
             return Response(
-                {"error": "ログインユーザーに口座が紐づいていません。"},
-                status=status.HTTP_409_CONFLICT,
+                {"error": "メールアドレスまたはパスワードが正しくありません。"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
         token, _ = Token.objects.get_or_create(user=user)
         return Response(
             {
                 "token": token.key,
-                "username": user.username,
+                "email": user.email,
                 "account": account_data(account),
             }
         )
@@ -173,7 +178,7 @@ class CurrentUserView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
         return Response(
-            {"username": request.user.username, "account": account_data(account)}
+            {"email": request.user.email, "account": account_data(account)}
         )
 
 

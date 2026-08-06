@@ -3,10 +3,9 @@ import './AuthScreen.css';
 
 function AuthScreen({ onLogin, onSignup }) {
   const [mode, setMode] = useState('login');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userName, setUserName] = useState('');
-  const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,9 +15,9 @@ function AuthScreen({ onLogin, onSignup }) {
     setError('');
     try {
       if (mode === 'login') {
-        await onLogin({ username, password });
+        await onLogin({ email, password });
       } else {
-        await onSignup({ username, password, user_name: userName, email });
+        await onSignup({ email, password, user_name: userName });
       }
     } catch (apiError) {
       setError(apiError.message);
@@ -72,22 +71,15 @@ function AuthScreen({ onLogin, onSignup }) {
                 maxLength="100"
                 required
               />
-              <label htmlFor="auth-email">メールアドレス（任意）</label>
-              <input
-                id="auth-email"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                autoComplete="email"
-              />
             </>
           )}
 
-          <label htmlFor="auth-username">ログインID</label>
+          <label htmlFor="auth-email">メールアドレス</label>
           <input
-            id="auth-username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
+            id="auth-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
             required
           />
@@ -110,9 +102,6 @@ function AuthScreen({ onLogin, onSignup }) {
           </button>
         </form>
 
-        <p className="auth-card__dev-note">
-          開発用: yamada / teamf-dev-pass
-        </p>
       </section>
     </main>
   );

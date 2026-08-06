@@ -43,7 +43,7 @@ export function AuthProvider({ children }) {
   async function authenticate(requestFunction, values) {
     const data = await requestFunction(values);
     storeToken(data.token);
-    const nextSession = { username: data.username, account: data.account };
+    const nextSession = { email: data.email, account: data.account };
     setSession(nextSession);
     return nextSession;
   }

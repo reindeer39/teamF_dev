@@ -70,17 +70,17 @@ python manage.py runserver
 
 モックデータ投入後は、次の開発用アカウントですぐにログインできます。
 
-| ログインID | パスワード | 口座番号 |
+| メールアドレス | パスワード | 口座番号 |
 |---|---|---|
-| `yamada` | `teamf-dev-pass` | `1000001` |
-| `sato` | `teamf-dev-pass` | `1000002` |
-| `suzuki` | `teamf-dev-pass` | `1000003` |
+| `yamada@example.com` | `teamf-dev-pass` | `1000001` |
+| `sato@example.com` | `teamf-dev-pass` | `1000002` |
+| `suzuki@example.com` | `teamf-dev-pass` | `1000003` |
 
 これらはローカル開発専用です。本番環境では使用しないでください。ログイントークンはブラウザのlocalStorageへ保存されるため、ページを再読み込みしてもログイン状態が復元されます。
 
 ## 仕様書
 
-- [バックエンド連携ガイド](backend/BACKEND_FLOW_GUIDE.md) — ReactからAPI、Django ORM、SQLite、レスポンスまでの初心者向け解説
+- [React・API・DB連携ガイド](backend/BACKEND_FLOW_GUIDE.md) — ログイン、画面表示、送金を実コードに沿って追う解説
 - [API仕様書](backend/API_DOCUMENTATION.md) — エンドポイント一覧、リクエスト/レスポンス形式
 - [データベース仕様書](backend/DATABASE_DOCUMENTATION.md) — テーブル定義、制約、ER概要
 
@@ -411,7 +411,7 @@ Django API単体は次のコマンドで確認できます。
 ```bash
 TOKEN=$(curl -s -X POST \
   -H "Content-Type: application/json" \
-  -d '{"username":"yamada","password":"teamf-dev-pass"}' \
+  -d '{"email":"yamada@example.com","password":"teamf-dev-pass"}' \
   http://127.0.0.1:8000/api/auth/login | python -c \
   'import json,sys; print(json.load(sys.stdin)["token"])')
 

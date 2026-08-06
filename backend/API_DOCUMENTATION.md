@@ -16,14 +16,13 @@ Authorization: Token <loginまたはsignupで取得したtoken>
 
 ```json
 {
-  "username": "new-user",
+  "email": "new-user@example.com",
   "password": "十分に強いパスワード",
-  "user_name": "表示名",
-  "email": "user@example.com"
+  "user_name": "表示名"
 }
 ```
 
-Django Userと残高0円のAccountを同一トランザクション内で作成し、`201 Created`でトークンと口座情報を返します。口座番号は重複しない7桁の番号を自動生成します。
+Django Userと残高0円のAccountを同一トランザクション内で作成し、`201 Created`でトークン、メールアドレス、口座情報を返します。口座番号は重複しない7桁の番号を自動生成します。
 
 ### ログイン
 
@@ -31,12 +30,12 @@ Django Userと残高0円のAccountを同一トランザクション内で作成�
 
 ```json
 {
-  "username": "yamada",
+  "email": "yamada@example.com",
   "password": "teamf-dev-pass"
 }
 ```
 
-成功時は`token`、`username`、紐づく`account`を返します。
+成功時は`token`、`email`、紐づく`account`を返します。メールアドレス不存在、パスワード不一致、Account未紐付けのいずれでも、アカウント推測を防ぐため同じエラーメッセージを返します。
 
 ### ログイン状態・ログアウト
 

@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
+from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
 from django.utils.dateparse import parse_datetime
@@ -75,8 +76,9 @@ class Command(BaseCommand):
                         auth_user, user_created = User.objects.get_or_create(
                             username=item["login_username"]
                         )
+                        auth_user.email = item["login_email"].strip().lower()
                         auth_user.set_password(item["login_password"])
-                        auth_user.save(update_fields=["password"])
+                        auth_user.save(update_fields=["email", "password"])
                         auth_user_created += int(user_created)
                         auth_user_updated += int(not user_created)
                     account_defaults = {
@@ -225,6 +227,7 @@ class Command(BaseCommand):
 
         seen_accounts = set()
         seen_login_usernames = set()
+        seen_login_emails = set()
         for index, item in enumerate(data["accounts"]):
             location = f"accounts[{index}]"
             if not isinstance(item, dict):
@@ -245,11 +248,15 @@ class Command(BaseCommand):
                     f"{location}.account_balanceは0以上の整数にしてください。"
                 )
             login_username = item.get("login_username")
+            login_email = item.get("login_email")
             login_password = item.get("login_password")
-            if (login_username is None) != (login_password is None):
+            login_fields = (login_username, login_email, login_password)
+            if any(value is None for value in login_fields) and not all(
+                value is None for value in login_fields
+            ):
                 raise CommandError(
-                    f"{location}.login_usernameとlogin_passwordは両方設定するか、"
-                    "両方省略してください。"
+                    f"{location}.login_username、login_email、login_passwordは"
+                    "すべて設定するか、すべて省略してください。"
                 )
             if login_username is not None:
                 if not isinstance(login_username, str) or not login_username.strip():
@@ -262,6 +269,19 @@ class Command(BaseCommand):
                         f"{login_username}"
                     )
                 seen_login_usernames.add(login_username)
+                try:
+                    validate_email(login_email)
+                except (TypeError, ValidationError):
+                    raise CommandError(
+                        f"{location}.login_emailは正しいメールアドレス形式にしてください。"
+                    )
+                normalized_email = login_email.strip().lower()
+                if normalized_email in seen_login_emails:
+                    raise CommandError(
+                        f"{location}.login_emailがJSON内で重複しています: "
+                        f"{login_email}"
+                    )
+                seen_login_emails.add(normalized_email)
                 if not isinstance(login_password, str) or len(login_password) < 8:
                     raise CommandError(
                         f"{location}.login_passwordは8文字以上の文字列にしてください。"

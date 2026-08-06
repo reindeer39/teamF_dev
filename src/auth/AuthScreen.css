@@ -31,8 +31,7 @@
   text-transform: uppercase;
 }
 
-.auth-card__description,
-.auth-card__dev-note {
+.auth-card__description {
   color: #66716a;
   line-height: 1.6;
 }
@@ -106,13 +105,6 @@
 .auth-submit:disabled {
   cursor: wait;
   opacity: 0.65;
-}
-
-.auth-card__dev-note {
-  margin: 20px 0 0;
-  padding-top: 16px;
-  border-top: 1px solid #e4ebe6;
-  font-size: 0.85rem;
 }
 
 @media (max-width: 520px) {
