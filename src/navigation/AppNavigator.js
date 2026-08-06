@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Route, Routes } from 'react-router';
-
+import { useRoutes } from 'react-router';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
@@ -9,7 +8,7 @@ import NextScreen from '../NextScreen/NextScreen';
 import { ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 
-function MainAppFlow() {
+function AppNavigator() {
   const [currentScreen, setCurrentScreen] = useState('profile');
   const [account, setAccount] = useState(null);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
@@ -17,29 +16,28 @@ function MainAppFlow() {
   const [error, setError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
 
+  const invoiceScreen = useRoutes([
+    {
+      path: '/invoice/:invoiceNumber',
+      element: <ProcessPayment requesterName="山田 太郎" billingAmount={3000} message="ランチ代をお願いします" />,
+    },
+  ]);
+
   useEffect(() => {
     let active = true;
-
     setLoading(true);
     setError('');
 
+    // API連携ポイント: 画面表示時と送金完了後に最新残高をDBから再取得する。
     getUserSummary(ACCOUNT_NUMBER)
       .then((data) => {
-        if (active) {
-          setAccount(data);
-        }
+        if (active) setAccount(data);
       })
       .catch((apiError) => {
-        if (active) {
-          setError(
-            `口座情報を取得できませんでした: ${apiError.message}`
-          );
-        }
+        if (active) setError(`口座情報を取得できませんでした: ${apiError.message}`);
       })
       .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       });
 
     return () => {
@@ -47,13 +45,15 @@ function MainAppFlow() {
     };
   }, [reloadCount]);
 
+  if (invoiceScreen) {
+    return invoiceScreen;
+  }
+
   if (currentScreen === 'recipients') {
     return (
       <SelectSendMoney
         senderAccountNumber={ACCOUNT_NUMBER}
-        onBack={() => {
-          setCurrentScreen('profile');
-        }}
+        onBack={() => setCurrentScreen('profile')}
         onSelectRecipient={(recipient) => {
           setSelectedRecipient(recipient);
           setCurrentScreen('transfer');
@@ -66,13 +66,9 @@ function MainAppFlow() {
     return (
       <ProcessSendMoney
         senderAccountNumber={ACCOUNT_NUMBER}
-        recipientAccountNumber={
-          selectedRecipient.account_number
-        }
+        recipientAccountNumber={selectedRecipient.account_number}
         accountBalance={account?.account_balance || 0}
-        onBack={() => {
-          setCurrentScreen('recipients');
-        }}
+        onBack={() => setCurrentScreen('recipients')}
         onTransferComplete={() => {
           setSelectedRecipient(null);
           setCurrentScreen('profile');
@@ -83,13 +79,7 @@ function MainAppFlow() {
   }
 
   if (currentScreen === 'billing') {
-    return (
-      <NextScreen
-        onBack={() => {
-          setCurrentScreen('profile');
-        }}
-      />
-    );
+    return <NextScreen onBack={() => setCurrentScreen('profile')} />;
   }
 
   return (
@@ -97,40 +87,9 @@ function MainAppFlow() {
       account={account}
       loading={loading}
       error={error}
-      onSelectRecipient={() => {
-        setCurrentScreen('recipients');
-      }}
-      onBilling={() => {
-        setCurrentScreen('billing');
-      }}
+      onSelectRecipient={() => setCurrentScreen('recipients')}
+      onBilling={() => setCurrentScreen('billing')}
     />
-  );
-}
-
-function AppNavigator() {
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={<MainAppFlow />}
-      />
-
-      <Route
-        path="/invoice/:invoiceNumber"
-        element={
-          <ProcessPayment
-            requesterName="山田 太郎"
-            billingAmount={3000}
-            message="ランチ代をお願いします"
-            onPayment={() => {
-              console.log(
-                '支払いボタンが押されました'
-              );
-            }}
-          />
-        }
-      />
-    </Routes>
   );
 }
 
