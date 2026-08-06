@@ -22,14 +22,20 @@ function ProcessPayment({
   onBack,
   onReturnTop,
 }) {
-  // 支払者の口座情報を保存する
+  // 支払者の口座情報
   const [payerAccount, setPayerAccount] = useState(null);
 
-  // 口座情報を読み込み中かどうか
+  // 口座情報を読み込み中か
   const [loading, setLoading] = useState(true);
 
-  // API通信で発生したエラー
+  // 支払い処理中か
+  const [submitting, setSubmitting] = useState(false);
+
+  // API通信などで発生したエラー
   const [error, setError] = useState('');
+
+  // 支払い成功後の結果
+  const [result, setResult] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -66,25 +72,94 @@ function ProcessPayment({
   // API取得前は0円、取得後は支払者の実際の残高を使用する
   const payerBalance = payerAccount?.account_balance ?? 0;
 
-  // 比較に使うため数字へ変換する
+  // 残高と請求金額を数字へ変換する
   const numericBalance = Number(payerBalance);
   const numericBillingAmount = Number(billingAmount);
 
   // 支払いボタンを押せる条件
   const canPay =
     !loading &&
+    !submitting &&
     !error &&
     Number.isFinite(numericBalance) &&
     Number.isInteger(numericBillingAmount) &&
     numericBillingAmount > 0 &&
     numericBillingAmount <= numericBalance;
 
-  const handlePayment = () => {
-    if (canPay && onPayment) {
-      onPayment();
+  // 支払いボタンを押したときの処理
+  const handlePayment = async () => {
+    if (!canPay) return;
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      // 現在は仮処理。
+      // 支払いAPI完成後は、onPayment内でAPIを呼び出す。
+      const paymentResult = onPayment
+        ? await onPayment()
+        : null;
+
+      // APIレスポンスがまだない場合も、
+      // 画面確認用として請求金額を結果に保存する。
+      setResult({
+        ...(paymentResult || {}),
+        payment_amount:
+          paymentResult?.payment_amount ??
+          paymentResult?.invoice_amount ??
+          numericBillingAmount,
+      });
+    } catch (paymentError) {
+      setError(
+        `支払いできませんでした: ${paymentError.message}`
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  // 支払い完了画面
+  if (result) {
+    return (
+      <main className="payment-screen payment-complete">
+        <h1 className="payment-complete__title">
+          支払いが完了しました
+        </h1>
+
+        <section className="payment-complete__summary">
+          <p className="payment-complete__amount-label">
+            支払い金額
+          </p>
+
+          <strong className="payment-complete__amount">
+            {formatYen(result.payment_amount)}
+          </strong>
+        </section>
+
+        <p className="payment-complete__recipient">
+          {requesterName}さんへ支払いました。
+        </p>
+
+        {result.transaction_number && (
+          <p className="payment-complete__transaction">
+            取引番号：{result.transaction_number}
+          </p>
+        )}
+
+        <NavigationButton
+          width="100%"
+          height="54px"
+          backgroundColor="#e76f75"
+          hoverColor="#d75d64"
+          onClick={onReturnTop}
+        >
+          トップへ戻る
+        </NavigationButton>
+      </main>
+    );
+  }
+
+  // 支払い前の通常画面
   return (
     <main className="payment-screen">
       {onBack && (
@@ -165,6 +240,7 @@ function ProcessPayment({
       )}
 
       {!loading &&
+        !submitting &&
         !error &&
         !canPay &&
         numericBillingAmount > 0 && (
@@ -184,7 +260,11 @@ function ProcessPayment({
         disabled={!canPay}
         onClick={handlePayment}
       >
-        {loading ? '読み込み中...' : '支払う'}
+        {loading
+          ? '読み込み中...'
+          : submitting
+            ? '支払い中...'
+            : '支払う'}
       </NavigationButton>
 
       {onReturnTop && (

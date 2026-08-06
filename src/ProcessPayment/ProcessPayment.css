@@ -94,6 +94,54 @@
   margin: 20px auto 0;
 }
 
+/* 支払い完了画面 */
+.payment-complete {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.payment-complete__title {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.payment-complete__summary {
+  width: 100%;
+  padding: 28px 20px;
+  border: 1px solid #dddddd;
+  border-radius: 16px;
+  box-sizing: border-box;
+  background-color: #ffffff;
+}
+
+.payment-complete__amount-label {
+  margin: 0 0 12px;
+  color: #555555;
+  font-size: 17px;
+}
+
+.payment-complete__amount {
+  display: block;
+  color: #222222;
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.payment-complete__recipient {
+  margin: 0;
+  font-size: 18px;
+}
+
+.payment-complete__transaction {
+  margin: 0;
+  color: #555555;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 350px) {
   .payment-screen {
     padding-right: 20px;
@@ -112,5 +160,13 @@
   .payment-screen__name,
   .payment-screen__value {
     font-size: 19px;
+  }
+
+  .payment-complete__title {
+    font-size: 24px;
+  }
+
+  .payment-complete__amount {
+    font-size: 34px;
   }
 }
