@@ -96,6 +96,19 @@ function BillingStatusScreen({ onBack }) {
     setOpenInvoiceNumber(invoiceNumber);
   };
 
+  const copyInvoiceLink = async (invoiceNumber) => {
+    const invoiceUrl = `${window.location.origin}/invoice/${encodeURIComponent(
+      invoiceNumber
+    )}`;
+
+    try {
+      await navigator.clipboard.writeText(invoiceUrl);
+      window.alert('リンクをコピーしました。');
+    } catch (error) {
+      window.alert(`リンクをコピーできませんでした: ${error.message}`);
+    }
+  };
+
   return (
     <main className="billing-status-screen">
       <section className="billing-status-panel">
@@ -189,7 +202,11 @@ function BillingStatusScreen({ onBack }) {
                           </p>
 
                           {!isPaid && (
-                            <button className="billing-copy-link-button" type="button">
+                            <button
+                              className="billing-copy-link-button"
+                              type="button"
+                              onClick={() => copyInvoiceLink(invoiceNumber)}
+                            >
                               リンクをコピー
                             </button>
                           )}
