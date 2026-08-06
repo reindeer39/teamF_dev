@@ -4,10 +4,10 @@ import {
   useParams,
 } from 'react-router';
 
-import requesterDefaultIcon from '../images/human2.png';
 import NavigationButton from '../components/NavigationButton';
 import { PAYMENT_ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
+import { resolveUserIcon } from '../userIcons';
 import './ProcessPayment.css';
 
 function formatYen(value) {
@@ -20,7 +20,7 @@ function formatYen(value) {
 
 function ProcessPayment({
   requesterName = '請求元ユーザー',
-  requesterIcon = requesterDefaultIcon,
+  requesterIcon = '',
   billingAmount = 0,
   message = '',
   onPayment,
@@ -212,7 +212,7 @@ function ProcessPayment({
         <div className="payment-screen__requester">
           <img
             className="payment-screen__icon"
-            src={requesterIcon}
+            src={resolveUserIcon(requesterIcon)}
             alt={`${requesterName}のアイコン`}
           />
 

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import recipientIcon from '../images/human2.png';
 import { createTransfer, getRecipientInfo } from '../api/users';
 import './ProcessSendMoney.css';
 import NavigationButton from '../components/NavigationButton';
+import { resolveUserIcon } from '../userIcons';
 
 function ProcessSendMoney({
   senderAccountNumber,
@@ -91,7 +91,11 @@ function ProcessSendMoney({
       <section className="recipient-section">
         <p className="section-label">送金先</p>
         <div className="recipient-info">
-          <img className="recipient-icon" src={recipientIcon} alt="送金先のユーザー" />
+          <img
+            className="recipient-icon"
+            src={resolveUserIcon(recipient?.recipient_icon)}
+            alt={`${recipient?.recipient_name || '送金先ユーザー'}のアイコン`}
+          />
           <p className="recipient-name">
             {loading ? '読み込み中...' : recipient?.recipient_name}
           </p>

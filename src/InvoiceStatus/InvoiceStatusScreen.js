@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getUserSummary } from '../api/users';
-import human1 from '../images/human1.png';
+import { resolveUserIcon } from '../userIcons';
 import './InvoiceStatusScreen.css';
-
-const USER_ICONS = {
-  'user1.png': human1,
-};
 
 const INVOICE_REQUESTS = [
   {
@@ -32,14 +28,6 @@ const INVOICE_DETAILS = {
     invoice_amount: 100000,
   },
 };
-
-function resolveUserIcon(iconPath) {
-  if (!iconPath) return '';
-
-  const normalizedPath = iconPath.replaceAll('\\', '/');
-  const fileName = normalizedPath.split('/').pop();
-  return USER_ICONS[fileName] || normalizedPath;
-}
 
 function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
