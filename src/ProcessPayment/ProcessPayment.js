@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react';
+import {
+  useNavigate,
+  useParams,
+} from 'react-router';
+
 import requesterDefaultIcon from '../images/human2.png';
 import NavigationButton from '../components/NavigationButton';
 import { PAYMENT_ACCOUNT_NUMBER } from '../account';
@@ -20,8 +25,13 @@ function ProcessPayment({
   message = '',
   onPayment,
   onBack,
-  onReturnTop,
 }) {
+  // URLの /invoice/:invoiceNumber から請求番号を取得する
+  const { invoiceNumber } = useParams();
+
+  // URLによる画面遷移に使用する
+  const navigate = useNavigate();
+
   // 支払者の口座情報
   const [payerAccount, setPayerAccount] = useState(null);
 
@@ -39,6 +49,16 @@ function ProcessPayment({
 
   useEffect(() => {
     let active = true;
+
+    // URLから請求番号を取得できなかった場合
+    if (!invoiceNumber) {
+      setError('請求番号を取得できませんでした。');
+      setLoading(false);
+
+      return () => {
+        active = false;
+      };
+    }
 
     setLoading(true);
     setError('');
@@ -67,7 +87,7 @@ function ProcessPayment({
     return () => {
       active = false;
     };
-  }, []);
+  }, [invoiceNumber]);
 
   // API取得前は0円、取得後は支払者の実際の残高を使用する
   const payerBalance = payerAccount?.account_balance ?? 0;
@@ -95,13 +115,14 @@ function ProcessPayment({
 
     try {
       // 現在は仮処理。
-      // 支払いAPI完成後は、onPayment内でAPIを呼び出す。
+      // 支払いAPI完成後は、invoiceNumberを使って
+      // ここから支払いAPIを呼び出す。
       const paymentResult = onPayment
-        ? await onPayment()
+        ? await onPayment(invoiceNumber)
         : null;
 
-      // APIレスポンスがまだない場合も、
-      // 画面確認用として請求金額を結果に保存する。
+      // 支払いAPIがまだないため、
+      // 仮の支払い結果を作って完了画面を表示する。
       setResult({
         ...(paymentResult || {}),
         payment_amount:
@@ -116,6 +137,11 @@ function ProcessPayment({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // トップ画面へ戻る
+  const handleReturnTop = () => {
+    navigate('/');
   };
 
   // 支払い完了画面
@@ -151,7 +177,7 @@ function ProcessPayment({
           height="54px"
           backgroundColor="#e76f75"
           hoverColor="#d75d64"
-          onClick={onReturnTop}
+          onClick={handleReturnTop}
         >
           トップへ戻る
         </NavigationButton>
@@ -267,15 +293,13 @@ function ProcessPayment({
             : '支払う'}
       </NavigationButton>
 
-      {onReturnTop && (
-        <button
-          type="button"
-          className="text-button payment-screen__top-link"
-          onClick={onReturnTop}
-        >
-          トップ画面へ戻る
-        </button>
-      )}
+      <button
+        type="button"
+        className="text-button payment-screen__top-link"
+        onClick={handleReturnTop}
+      >
+        トップ画面へ戻る
+      </button>
     </main>
   );
 }
