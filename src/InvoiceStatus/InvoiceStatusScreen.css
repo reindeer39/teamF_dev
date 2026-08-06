@@ -1,0 +1,260 @@
+/* ===== 画面全体 ===== */
+.invoice-status-screen {
+  display: flex;
+  box-sizing: border-box;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 3vmin, 24px);
+  padding: clamp(12px, 3vh, 24px) 0;
+  background-color: #f5f5f5;
+  color: #222222;
+}
+
+/* ===== ヘッダー ===== */
+.invoice-status-header {
+  display: grid;
+  grid-template-columns:
+    clamp(40px, 6vmin, 48px)
+    1fr
+    clamp(40px, 6vmin, 48px);
+  align-items: center;
+  padding-bottom: clamp(12px, 3vmin, 24px);
+  border-bottom: 1px solid #999999;
+}
+
+.invoice-status-header::after {
+  content: '';
+}
+
+.invoice-back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 5vh;
+  height: 5vh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #222222;
+  font-size: clamp(2rem, 6vmin, 2.5rem);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.invoice-back-button:hover {
+  color: #666666;
+}
+
+.invoice-back-button:focus-visible {
+  outline: 2px solid #316745;
+  outline-offset: 2px;
+}
+
+.invoice-status-panel {
+  width: 85vw;
+  max-width: 80vh;
+  box-sizing: border-box;
+  padding: clamp(12px, 3vmin, 24px);
+  background-color: #f5f5f5;
+}
+
+.invoice-status-title {
+  margin: 0;
+  font-size: clamp(1.75rem, 7vw, 2.5rem);
+  font-weight: 500;
+  text-align: center;
+}
+
+/* ===== 請求一覧 ===== */
+.invoice-list {
+  width: 100%;
+}
+
+.invoice-list-message--error {
+  color: #b91c1c;
+}
+
+.invoice-item {
+  border-bottom: 1px solid #999999;
+}
+
+.invoice-item-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto clamp(36px, 5vmin, 44px);
+  align-items: center;
+  gap: clamp(6px, 2vmin, 12px);
+  min-height: clamp(56px, 8vh, 72px);
+  font-size: clamp(1rem, 4vw, 1.35rem);
+}
+
+.invoice-item-status {
+  padding:
+    clamp(3px, 0.6vmin, 5px)
+    clamp(8px, 1.5vmin, 12px);
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.invoice-item-status--paid {
+  background-color: #dceadf;
+  color: #245033;
+}
+
+.invoice-item-status--unpaid {
+  background-color: #e0e0e0;
+  color: #555555;
+}
+
+/* ===== トグルボタン ===== */
+.invoice-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(36px, 5vmin, 44px);
+  height: clamp(36px, 5vmin, 44px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #333333;
+  font-size: clamp(1.5rem, 4vmin, 1.9rem);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.invoice-toggle-icon {
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.invoice-toggle-icon--up {
+  transform: rotate(90deg);
+}
+
+.invoice-toggle-icon--down {
+  transform: rotate(-90deg);
+}
+
+/* ===== 請求詳細 ===== */
+.invoice-item-details {
+  padding:
+    clamp(6px, 1vmin, 10px)
+    clamp(6px, 1vmin, 10px)
+    clamp(12px, 2vmin, 18px);
+}
+
+.invoice-user-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 3vmin, 24px);
+  width: 100%;
+  box-sizing: border-box;
+  padding:
+    clamp(10px, 2vmin, 14px)
+    clamp(12px, 2.5vmin, 16px);
+  border-radius: clamp(8px, 1.5vmin, 12px);
+  background-color: #e8f0eb;
+  font-size: clamp(1rem, 4vw, 1.35rem);
+}
+
+.invoice-payer-label {
+  flex-shrink: 0;
+  padding:
+    clamp(4px, 0.7vmin, 6px)
+    clamp(8px, 1.5vmin, 12px);
+  border-radius: 999px;
+  background-color: #316745;
+  color: #ffffff;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.invoice-user-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.invoice-face {
+  width: clamp(44px, 10vmin, 100px);
+  height: clamp(44px, 10vmin, 100px);
+  flex: 0 0 clamp(44px, 10vmin, 100px);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.invoice-amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(8px, 2vmin, 16px);
+  margin: clamp(12px, 2vmin, 18px) 0;
+  padding:
+    clamp(10px, 1.8vmin, 14px)
+    clamp(12px, 2.5vmin, 18px);
+  border-radius: clamp(6px, 1vmin, 10px);
+  background-color: #eeeeee;
+}
+
+.invoice-amount-row--unpaid {
+  justify-content: space-between;
+}
+
+.invoice-amount {
+  margin: 0;
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-weight: 600;
+  text-align: center;
+}
+
+.invoice-copy-link-button {
+  flex-shrink: 0;
+  padding:
+    clamp(6px, 1vmin, 9px)
+    clamp(8px, 1.8vmin, 14px);
+  border: 1px solid #316745;
+  border-radius: clamp(5px, 0.8vmin, 8px);
+  background-color: transparent;
+  color: #316745;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* ===== メッセージ ===== */
+.invoice-message-label {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1vmin, 10px);
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  font-weight: 600;
+}
+
+.invoice-message-label textarea {
+  height: clamp(60px, 10vh, 100px);
+  box-sizing: border-box;
+  padding: clamp(8px, 1.5vmin, 14px);
+  border: 1px solid #888888;
+  border-radius: 0;
+  overflow-y: auto;
+  resize: none;
+  background-color: #f5f5f5;
+  color: #222222;
+  font: inherit;
+}
+
+/* ===== スマートフォン ===== */
+@media (max-width: 420px) {
+  .invoice-status-panel {
+    width: 94vw;
+    padding: 4vmin 3vmin;
+  }
+
+  .invoice-item-summary {
+    gap: 1.5vmin;
+  }
+
+  .invoice-user-row {
+    gap: 4vmin;
+  }
+}

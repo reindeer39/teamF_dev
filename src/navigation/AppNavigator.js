@@ -6,6 +6,7 @@ import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
 import ProcessPayment from '../ProcessSendMoney/ProcessSendMoney';
 import MakeInvoiceLink from '../MakeInvoiceLink/MakeInvoiceLink';
 import CopyInvoiceLink from '../CopyInvoiceLink/CopyInvoiceLink';
+import InvoiceStatusScreen from '../InvoiceStatus/InvoiceStatusScreen';
 import { ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 
@@ -103,13 +104,22 @@ function AppNavigator() {
     );
   }
 
+  if (currentScreen === 'invoiceStatus') {
+    return (
+      <InvoiceStatusScreen
+        onBack={() => setCurrentScreen('profile')}
+      />
+    );
+  }
+
   return (
     <TopScreen
       account={account}
       loading={loading}
       error={error}
       onSelectRecipient={() => setCurrentScreen('recipients')}
-      onBilling={() => setCurrentScreen('billing')}
+      onInvoice={() => setCurrentScreen('invoice')}
+      onInvoiceStatus={() => setCurrentScreen('invoiceStatus')}
     />
   );
 }

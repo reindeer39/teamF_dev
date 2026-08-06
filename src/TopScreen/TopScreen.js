@@ -2,9 +2,9 @@ import './TopScreen.css';
 import icon from '../images/human1.png';
 import NavigationButton from '../components/NavigationButton';
 
-function TopScreen({ account, loading, error, onSelectRecipient, onBilling }) {
+function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceStatus,}) {
   const buttonWidth = '80vw';
-  const buttonHeight = '72px';
+  const buttonHeight = '7vh';
   const buttonColor = '#316745';
   const buttonHoverColor = '#9ca3af';
   const buttonTextColor = '#ffffff';
@@ -55,9 +55,20 @@ function TopScreen({ account, loading, error, onSelectRecipient, onBilling }) {
           backgroundColor={buttonColor}
           hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
-          onClick={onBilling}
+          onClick={onInvoice}
         >
           請求する
+        </NavigationButton>
+
+        <NavigationButton
+          width={buttonWidth}
+          height={buttonHeight}
+          backgroundColor={buttonColor}
+          hoverColor={buttonHoverColor}
+          textColor={buttonTextColor}
+          onClick={onInvoiceStatus}
+        >
+          請求状態確認
         </NavigationButton>
       </div>
     </div>
