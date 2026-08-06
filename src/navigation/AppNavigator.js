@@ -3,7 +3,7 @@ import { useRoutes } from 'react-router';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
-import ProcessPayment from '../ProcessSendMoney/ProcessSendMoney';
+import ProcessPayment from '../ProcessPayment/ProcessPayment';
 import MakeInvoiceLink from '../MakeInvoiceLink/MakeInvoiceLink';
 import CopyInvoiceLink from '../CopyInvoiceLink/CopyInvoiceLink';
 import InvoiceStatusScreen from '../InvoiceStatus/InvoiceStatusScreen';
