@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMatch } from 'react-router-dom';
+import { useMatch, useNavigate } from 'react-router-dom';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
@@ -14,6 +14,7 @@ import { createInvoice } from '../api/invoices';
 
 function AppNavigator() {
   const { session, initializing, login, signup, signOut } = useAuth();
+  const navigate = useNavigate();
   const [currentScreen, setCurrentScreen] = useState('profile');
   const [account, setAccount] = useState(session?.account || null);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
@@ -60,7 +61,12 @@ function AppNavigator() {
   }
 
   if (invoiceMatch) {
-    return <ProcessPayment invoiceNumber={invoiceMatch.params.invoiceNumber} />;
+    return (
+      <ProcessPayment
+        invoiceNumber={invoiceMatch.params.invoiceNumber}
+        onSwitchAccount={signOut}
+      />
+    );
   }
 
   if (currentScreen === 'recipients') {
@@ -108,6 +114,12 @@ function AppNavigator() {
       <CopyInvoiceLink
         invoiceLink={invoiceLink}
         onBack={() => setCurrentScreen('profile')}
+        onOpenAsAnotherAccount={async () => {
+          const invoicePath = new URL(invoiceLink, window.location.origin).pathname;
+          setCurrentScreen('profile');
+          await signOut();
+          navigate(invoicePath);
+        }}
       />
     );
   }
@@ -115,7 +127,9 @@ function AppNavigator() {
   if (currentScreen === 'invoiceStatus') {
     return (
       <InvoiceStatusScreen
+        account={account}
         onBack={() => setCurrentScreen('profile')}
+        onSwitchAccount={signOut}
       />
     );
   }

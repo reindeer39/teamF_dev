@@ -1123,6 +1123,14 @@ class AuthenticatedInvoiceAPITests(APITestCase):
             str(invoice.transaction_number_id),
         )
 
+        self.client.credentials()
+        self.authenticate(self.issuer_user)
+        list_response = self.client.get("/api/invoices/")
+        paid_invoice = list_response.data["invoice_list"][0]
+        self.assertEqual(paid_invoice["invoice_flag"], "paid")
+        self.assertEqual(paid_invoice["paid_by"]["account_number"], "4300002")
+        self.assertEqual(paid_invoice["paid_by"]["user_name"], "支払者")
+
     def test_issuer_cannot_pay_own_invoice(self):
         invoice = Invoice.objects.create(
             invoice_amount=500,

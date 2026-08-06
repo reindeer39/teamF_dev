@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getMyInvoices } from '../api/invoices';
-import human1 from '../images/human1.png';
+import { resolveUserIcon } from '../utils/resolveUserIcon';
 import './InvoiceStatusScreen.css';
 
 
@@ -8,14 +8,17 @@ function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
 }
 
-function InvoiceStatusScreen({ onBack }) {
+function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
   const [invoices, setInvoices] = useState([]);
   const [openInvoiceNumber, setOpenInvoiceNumber] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshCount, setRefreshCount] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError('');
     getMyInvoices()
       .then((data) => {
         if (active) setInvoices(data.invoice_list);
@@ -29,6 +32,12 @@ function InvoiceStatusScreen({ onBack }) {
     return () => {
       active = false;
     };
+  }, [refreshCount]);
+
+  useEffect(() => {
+    const refreshOnFocus = () => setRefreshCount((count) => count + 1);
+    window.addEventListener('focus', refreshOnFocus);
+    return () => window.removeEventListener('focus', refreshOnFocus);
   }, []);
 
   async function copyInvoiceLink(invoiceNumber) {
@@ -53,8 +62,29 @@ function InvoiceStatusScreen({ onBack }) {
           >
             &lt;
           </button>
-          <h1 className="invoice-status-title">請求リスト</h1>
+          <h1 className="invoice-status-title">お願いした請求</h1>
         </header>
+
+        <div className="invoice-status-owner">
+          <p>
+            請求元：<strong>{account?.user_name || 'ログイン中のアカウント'}</strong>
+          </p>
+          <p>この画面には、自分が発行した請求だけが表示されます。</p>
+          <div className="invoice-status-actions">
+            <button
+              type="button"
+              onClick={() => setRefreshCount((count) => count + 1)}
+              disabled={loading}
+            >
+              {loading ? '更新中...' : '最新の状態に更新'}
+            </button>
+            {onSwitchAccount && (
+              <button type="button" onClick={onSwitchAccount}>
+                別の請求元アカウントで確認
+              </button>
+            )}
+          </div>
+        </div>
 
         {loading && <p>読み込み中...</p>}
         {error && <p className="invoice-list-message--error">{error}</p>}
@@ -105,11 +135,14 @@ function InvoiceStatusScreen({ onBack }) {
                         <span className="invoice-payer-label">支払人</span>
                         <img
                           className="invoice-face"
-                          src={invoice.paid_by.user_icon || human1}
+                          src={resolveUserIcon(invoice.paid_by.user_icon)}
                           alt={`${invoice.paid_by.user_name}のアイコン`}
                         />
                         <strong>{invoice.paid_by.user_name}</strong>
                       </div>
+                    )}
+                    {!isPaid && (
+                      <p className="invoice-awaiting-payment">支払者からの支払い待ちです。</p>
                     )}
                     <div
                       className={`invoice-amount-row ${

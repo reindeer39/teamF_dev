@@ -5,6 +5,7 @@ import { getMySummary } from '../api/accounts';
 import { getInvoice, payInvoice } from '../api/invoices';
 import requesterDefaultIcon from '../images/human2.png';
 import NavigationButton from '../components/NavigationButton';
+import { resolveUserIcon } from '../utils/resolveUserIcon';
 import './ProcessPayment.css';
 
 
@@ -15,7 +16,7 @@ function formatYen(value) {
     : '---円';
 }
 
-function ProcessPayment({ invoiceNumber }) {
+function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
   const navigate = useNavigate();
   const [invoice, setInvoice] = useState(null);
   const [payerAccount, setPayerAccount] = useState(null);
@@ -23,6 +24,7 @@ function ProcessPayment({ invoiceNumber }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const [switchingAccount, setSwitchingAccount] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +71,18 @@ function ProcessPayment({ invoiceNumber }) {
     }
   }
 
+  async function handleSwitchAccount() {
+    if (!onSwitchAccount || switchingAccount) return;
+    setSwitchingAccount(true);
+    setError('');
+    try {
+      await onSwitchAccount();
+    } catch (switchError) {
+      setError(`ログアウトできませんでした: ${switchError.message}`);
+      setSwitchingAccount(false);
+    }
+  }
+
   if (result) {
     return (
       <main className="payment-screen payment-complete">
@@ -99,7 +113,7 @@ function ProcessPayment({ invoiceNumber }) {
         <div className="payment-screen__requester">
           <img
             className="payment-screen__icon"
-            src={invoice?.issuer.user_icon || requesterDefaultIcon}
+            src={resolveUserIcon(invoice?.issuer.user_icon, requesterDefaultIcon)}
             alt={invoice ? `${invoice.issuer.user_name}のアイコン` : ''}
           />
           <strong className="payment-screen__name">
@@ -134,7 +148,9 @@ function ProcessPayment({ invoiceNumber }) {
         <p className="payment-screen__warning" role="alert">この請求は支払済みです。</p>
       )}
       {!loading && isOwnInvoice && (
-        <p className="payment-screen__warning" role="alert">自分が発行した請求は支払えません。</p>
+        <p className="payment-screen__warning" role="alert">
+          自分が発行した請求は支払えません。支払者のアカウントへ切り替えてください。
+        </p>
       )}
       {!loading && invoice && !isPaid && !isOwnInvoice && !hasEnoughBalance && (
         <p className="payment-screen__warning" role="alert">
@@ -145,6 +161,16 @@ function ProcessPayment({ invoiceNumber }) {
       <NavigationButton disabled={!canPay} onClick={handlePayment}>
         {loading ? '読み込み中...' : submitting ? '支払い中...' : '支払う'}
       </NavigationButton>
+      {onSwitchAccount && (
+        <button
+          type="button"
+          className="text-button payment-screen__top-link"
+          onClick={handleSwitchAccount}
+          disabled={switchingAccount}
+        >
+          {switchingAccount ? 'ログアウト中...' : '別のアカウントでログイン'}
+        </button>
+      )}
       <button
         type="button"
         className="text-button payment-screen__top-link"

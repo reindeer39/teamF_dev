@@ -25,7 +25,7 @@ beforeEach(() => {
     issuer: {
       account_number: '1000001',
       user_name: '請求者',
-      user_icon: '',
+      user_icon: '/icons/user1.png',
     },
   });
   payInvoice.mockResolvedValue({
@@ -34,13 +34,13 @@ beforeEach(() => {
   });
 });
 
-function renderPayment() {
+function renderPayment(props = {}) {
   return render(
     <MemoryRouter
       initialEntries={[`/invoice/${invoiceNumber}`]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
-      <ProcessPayment invoiceNumber={invoiceNumber} />
+      <ProcessPayment invoiceNumber={invoiceNumber} {...props} />
     </MemoryRouter>
   );
 }
@@ -52,8 +52,28 @@ test('URLの請求番号からDBの請求内容とログイン口座残高を表
   expect(screen.getByText('10,000円')).toBeInTheDocument();
   expect(screen.getByText('2,500円')).toBeInTheDocument();
   expect(screen.getByText('夕食代')).toBeInTheDocument();
+  expect(screen.getByAltText('請求者のアイコン').getAttribute('src')).toContain(
+    'human1'
+  );
   expect(getInvoice).toHaveBeenCalledWith(invoiceNumber);
   expect(getMySummary).toHaveBeenCalledWith();
+});
+
+test('請求元本人には別アカウントへ切り替える導線を表示する', async () => {
+  getMySummary.mockResolvedValue({
+    account_number: '1000001',
+    user_name: '請求者',
+    account_balance: 10000,
+  });
+  const onSwitchAccount = jest.fn().mockResolvedValue();
+  renderPayment({ onSwitchAccount });
+
+  expect(
+    await screen.findByText(/支払者のアカウントへ切り替えてください/)
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '別のアカウントでログイン' }));
+
+  await waitFor(() => expect(onSwitchAccount).toHaveBeenCalledTimes(1));
 });
 
 test('支払うボタンで請求支払いAPIを呼び完了結果を表示する', async () => {

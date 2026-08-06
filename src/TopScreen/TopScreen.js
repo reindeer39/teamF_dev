@@ -1,6 +1,7 @@
 import './TopScreen.css';
 import icon from '../images/human1.png';
 import NavigationButton from '../components/NavigationButton';
+import { resolveUserIcon } from '../utils/resolveUserIcon';
 
 function TopScreen({
   account,
@@ -27,7 +28,11 @@ function TopScreen({
     <div className="top-screen">
       <header className="user-profile">
         <div className="user-profile__main">
-          <img src={icon} className="user-profile__icon" alt={`${userName}のアイコン`} />
+          <img
+            src={resolveUserIcon(account?.user_icon, icon)}
+            className="user-profile__icon"
+            alt={`${userName}のアイコン`}
+          />
           <div className="user-profile__details">
             <span className="user-profile__name">{userName}</span>
             <span className="user-profile__account-number">
