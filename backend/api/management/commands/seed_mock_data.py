@@ -1,6 +1,6 @@
 """共有JSONを各開発者のSQLiteへ投入するカスタム管理コマンド。
 
-APIが利用するAccountとTransactionを、fixture形式ではない通常のJSONから
+APIが利用するAccount、Transaction、Invoiceを、fixture形式ではない通常のJSONから
 作成します。実行方法は `python manage.py seed_mock_data` です。
 """
 
@@ -9,11 +9,13 @@ import uuid
 from pathlib import Path
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
+from django.utils.dateparse import parse_datetime
 
-from api.models import Account, Transaction
+from api.models import Account, Invoice, Transaction
 
 
 class Command(BaseCommand):
@@ -37,12 +39,17 @@ class Command(BaseCommand):
         account_updated = 0
         transaction_created = 0
         transaction_updated = 0
+        invoice_created = 0
+        invoice_updated = 0
 
         try:
-            # Account作成からTransaction作成までを全部成功・全部取消にする。
+            # 3種類のデータの削除・作成を全部成功または全部取消にする。
             with transaction.atomic():
                 if options["reset"]:
-                    # 外部キー制約に従い、必ずTransactionを先に削除する。
+                    # 外部キー制約に従い、Invoice、Transaction、Accountの順で削除する。
+                    invoice_numbers = [
+                        item["parsed_invoice_number"] for item in data["invoices"]
+                    ]
                     transaction_numbers = [
                         item["parsed_transaction_number"]
                         for item in data["transactions"]
@@ -50,6 +57,7 @@ class Command(BaseCommand):
                     account_numbers = [
                         item["account_number"] for item in data["accounts"]
                     ]
+                    Invoice.objects.filter(invoice_number__in=invoice_numbers).delete()
                     Transaction.objects.filter(
                         transaction_number__in=transaction_numbers
                     ).delete()
@@ -89,10 +97,70 @@ class Command(BaseCommand):
                     )
                     transaction_created += int(created)
                     transaction_updated += int(not created)
+
+                for index, item in enumerate(data["invoices"]):
+                    issuer = self._get_account(
+                        item["account_number"],
+                        index,
+                        "account_number",
+                        "invoices",
+                        item["invoice_number"],
+                    )
+                    payer = None
+                    if item.get("paid_by") is not None:
+                        payer = self._get_account(
+                            item["paid_by"],
+                            index,
+                            "paid_by",
+                            "invoices",
+                            item["invoice_number"],
+                        )
+                    linked_transaction = None
+                    if item.get("parsed_linked_transaction_number") is not None:
+                        linked_transaction = self._get_transaction(
+                            item["parsed_linked_transaction_number"],
+                            index,
+                            item["invoice_number"],
+                        )
+
+                    defaults = {
+                        "invoice_amount": item["invoice_amount"],
+                        "message": item.get("message", ""),
+                        "account_number": issuer,
+                        "invoice_flag": item["invoice_flag"],
+                        "paid_time": item["parsed_paid_time"],
+                        "paid_by": payer,
+                        "transaction_number": linked_transaction,
+                    }
+                    invoice = Invoice.objects.filter(
+                        invoice_number=item["parsed_invoice_number"]
+                    ).first()
+                    if invoice is None:
+                        invoice = Invoice(
+                            invoice_number=item["parsed_invoice_number"], **defaults
+                        )
+                    else:
+                        for field_name, value in defaults.items():
+                            setattr(invoice, field_name, value)
+                    try:
+                        invoice.full_clean()
+                    except ValidationError as exc:
+                        raise CommandError(
+                            f"invoices[{index}]（invoice_number="
+                            f"{item['invoice_number']}）の検証に失敗しました: {exc}"
+                        ) from exc
+
+                    _, created = Invoice.objects.update_or_create(
+                        invoice_number=item["parsed_invoice_number"],
+                        defaults=defaults,
+                    )
+                    invoice_created += int(created)
+                    invoice_updated += int(not created)
         except ProtectedError as exc:
             raise CommandError(
-                "--reset対象のAccountがJSON対象外のTransactionから参照されているため、"
-                "安全のため処理を中断しました。参照中のTransactionを確認してください。"
+                "--reset対象がJSON対象外の関連データから参照されているため、"
+                "安全のため処理を中断しました。Invoice、Transaction、Accountの"
+                "関連を確認してください。"
             ) from exc
         except CommandError:
             raise
@@ -108,6 +176,9 @@ class Command(BaseCommand):
         self.stdout.write(
             "Transaction："
             f"新規{transaction_created}件，更新{transaction_updated}件"
+        )
+        self.stdout.write(
+            f"Invoice：新規{invoice_created}件，更新{invoice_updated}件"
         )
 
     def _load_and_validate(self, path):
@@ -128,6 +199,8 @@ class Command(BaseCommand):
             raise CommandError("accountsは配列にしてください。")
         if not isinstance(data.get("transactions"), list):
             raise CommandError("transactionsは配列にしてください。")
+        if not isinstance(data.get("invoices"), list):
+            raise CommandError("invoicesは配列にしてください。")
 
         seen_accounts = set()
         for index, item in enumerate(data["accounts"]):
@@ -192,13 +265,127 @@ class Command(BaseCommand):
                     "同じ口座にできません。"
                 )
 
+        seen_invoices = set()
+        for index, item in enumerate(data["invoices"]):
+            location = f"invoices[{index}]"
+            if not isinstance(item, dict):
+                raise CommandError(f"{location}はオブジェクトにしてください。")
+            invoice_number = item.get("invoice_number")
+            try:
+                parsed_number = uuid.UUID(invoice_number)
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise CommandError(
+                    f"{location}.invoice_numberは正しいUUID形式にしてください: "
+                    f"{invoice_number!r}"
+                ) from exc
+            invoice_location = (
+                f"{location}（invoice_number={invoice_number}）"
+            )
+            if parsed_number in seen_invoices:
+                raise CommandError(
+                    f"{invoice_location}.invoice_numberがJSON内で重複しています。"
+                )
+            seen_invoices.add(parsed_number)
+            item["parsed_invoice_number"] = parsed_number
+
+            amount = item.get("invoice_amount")
+            if type(amount) is not int or amount < 1:
+                raise CommandError(
+                    f"{invoice_location}.invoice_amountは1以上の整数にしてください。"
+                )
+            issuer = item.get("account_number")
+            if not isinstance(issuer, str) or not issuer.strip():
+                raise CommandError(
+                    f"{invoice_location}.account_numberは空でない文字列にしてください。"
+                )
+            invoice_flag = item.get("invoice_flag")
+            if invoice_flag not in Invoice.InvoiceFlag.values:
+                raise CommandError(
+                    f"{invoice_location}.invoice_flagはnotpayまたはpaidにしてください。"
+                )
+
+            paid_time = item.get("paid_time")
+            parsed_paid_time = None
+            if paid_time is not None:
+                if not isinstance(paid_time, str):
+                    parsed_paid_time = None
+                else:
+                    parsed_paid_time = parse_datetime(paid_time)
+                if parsed_paid_time is None:
+                    raise CommandError(
+                        f"{invoice_location}.paid_timeは正しいISO 8601形式にしてください。"
+                    )
+            item["parsed_paid_time"] = parsed_paid_time
+
+            payer = item.get("paid_by")
+            if payer is not None and (
+                not isinstance(payer, str) or not payer.strip()
+            ):
+                raise CommandError(
+                    f"{invoice_location}.paid_byは口座番号の文字列またはnullにしてください。"
+                )
+            if payer is not None and payer == issuer:
+                raise CommandError(
+                    f"{invoice_location}.paid_byはaccount_numberと同じ口座にできません。"
+                )
+
+            linked_number = item.get("transaction_number")
+            parsed_linked_number = None
+            if linked_number is not None:
+                try:
+                    parsed_linked_number = uuid.UUID(linked_number)
+                except (AttributeError, TypeError, ValueError) as exc:
+                    raise CommandError(
+                        f"{invoice_location}.transaction_numberは正しいUUID形式または"
+                        "nullにしてください。"
+                    ) from exc
+            item["parsed_linked_transaction_number"] = parsed_linked_number
+
+            payment_values = {
+                "paid_time": paid_time,
+                "paid_by": payer,
+                "transaction_number": linked_number,
+            }
+            if invoice_flag == Invoice.InvoiceFlag.NOTPAY:
+                for field_name, value in payment_values.items():
+                    if value is not None:
+                        raise CommandError(
+                            f"{invoice_location}.{field_name}は未払い時にはnullにしてください。"
+                        )
+            else:
+                for field_name, value in payment_values.items():
+                    if value is None:
+                        raise CommandError(
+                            f"{invoice_location}.{field_name}は支払済み時には必須です。"
+                        )
+
         return data
 
-    def _get_account(self, account_number, index, field_name):
+    def _get_account(
+        self,
+        account_number,
+        index,
+        field_name,
+        collection="transactions",
+        invoice_number=None,
+    ):
         try:
             return Account.objects.get(account_number=account_number)
         except Account.DoesNotExist as exc:
+            invoice_context = (
+                f"（invoice_number={invoice_number}）" if invoice_number else ""
+            )
             raise CommandError(
-                f"transactions[{index}].{field_name}で指定された口座が存在しません: "
-                f"{account_number}"
+                f"{collection}[{index}]{invoice_context}.{field_name}で指定された"
+                f"口座が存在しません: {account_number}"
+            ) from exc
+
+    def _get_transaction(self, transaction_number, index, invoice_number):
+        try:
+            return Transaction.objects.get(transaction_number=transaction_number)
+        except Transaction.DoesNotExist as exc:
+            raise CommandError(
+                f"invoices[{index}]（invoice_number={invoice_number}）."
+                f"transaction_numberで指定されたTransactionが存在しません: "
+                f"{transaction_number}"
             ) from exc

@@ -1,4 +1,4 @@
-"""AccountとTransactionをDjango管理画面で確認するための表示設定。
+"""Account、Transaction、Invoiceの管理画面表示設定。
 
 APIの実行後に`/admin/`を開くと、残高と送金履歴がDBへ保存されたか確認できます。
 このファイルはReact向けAPIのレスポンスには影響しません。
@@ -7,7 +7,7 @@ APIの実行後に`/admin/`を開くと、残高と送金履歴がDBへ保存さ
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Account, Transaction
+from .models import Account, Invoice, Transaction
 
 
 @admin.register(Account)
@@ -44,3 +44,41 @@ class TransactionAdmin(admin.ModelAdmin):
         if not obj.created_at:
             return ""
         return timezone.localtime(obj.created_at).strftime("%Y-%m-%d %H:%M:%S.%f")
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    """請求情報の表示列、検索、絞り込み、読み取り専用項目を設定する。"""
+
+    list_display = (
+        "invoice_number",
+        "account_number",
+        "invoice_amount",
+        "invoice_flag",
+        "paid_by",
+        "formatted_created_time",
+        "formatted_paid_time",
+    )
+    search_fields = (
+        "invoice_number",
+        "account_number__account_number",
+        "account_number__user_name",
+        "paid_by__account_number",
+        "paid_by__user_name",
+        "message",
+        "transaction_number__transaction_number",
+    )
+    list_filter = ("invoice_flag", "created_time", "paid_time")
+    readonly_fields = ("invoice_number", "created_time")
+
+    @admin.display(ordering="created_time", description="created_time")
+    def formatted_created_time(self, obj):
+        if not obj.created_time:
+            return ""
+        return timezone.localtime(obj.created_time).strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    @admin.display(ordering="paid_time", description="paid_time")
+    def formatted_paid_time(self, obj):
+        if not obj.paid_time:
+            return ""
+        return timezone.localtime(obj.paid_time).strftime("%Y-%m-%d %H:%M:%S.%f")

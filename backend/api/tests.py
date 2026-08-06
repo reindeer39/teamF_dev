@@ -7,18 +7,21 @@
 import json
 import tempfile
 import uuid
+from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from api.management.commands.seed_mock_data import Command as SeedCommand
-from api.models import Account, Transaction
+from api.models import Account, Invoice, Transaction
 
 
 class ModelTests(TestCase):
@@ -104,6 +107,182 @@ class ModelTests(TestCase):
         self.assertQuerySetEqual(self.recipient.received_transactions.all(), [transfer])
 
 
+class InvoiceModelTests(TestCase):
+    """Invoiceのフィールド、モデル検証、DB制約、関連を確認する。"""
+
+    def setUp(self):
+        self.issuer = Account.objects.create(
+            account_number="2100001", user_name="請求者", account_balance=10000
+        )
+        self.payer = Account.objects.create(
+            account_number="2100002", user_name="支払者", account_balance=10000
+        )
+        self.other = Account.objects.create(
+            account_number="2100003", user_name="別口座", account_balance=10000
+        )
+        self.payment_transaction = Transaction.objects.create(
+            sender=self.payer,
+            recipient=self.issuer,
+            transfer_amount=3000,
+        )
+        self.other_transaction = Transaction.objects.create(
+            sender=self.other,
+            recipient=self.issuer,
+            transfer_amount=2000,
+        )
+
+    def _paid_invoice(self, **overrides):
+        values = {
+            "invoice_amount": 3000,
+            "account_number": self.issuer,
+            "invoice_flag": Invoice.InvoiceFlag.PAID,
+            "paid_time": timezone.now(),
+            "paid_by": self.payer,
+            "transaction_number": self.payment_transaction,
+        }
+        values.update(overrides)
+        return Invoice(**values)
+
+    def test_unpaid_invoice_can_be_created(self):
+        invoice = Invoice.objects.create(
+            invoice_amount=2500,
+            message="夕食代",
+            account_number=self.issuer,
+        )
+
+        invoice.full_clean()
+        self.assertIsInstance(invoice.invoice_number, uuid.UUID)
+        self.assertIsNotNone(invoice.created_time)
+        self.assertEqual(invoice.message, "夕食代")
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.NOTPAY)
+        self.assertEqual(str(invoice), "請求者：2500円（未払い）")
+
+    def test_paid_invoice_can_be_created(self):
+        invoice = self._paid_invoice()
+        invoice.full_clean()
+        invoice.save()
+
+        self.assertEqual(invoice.paid_by, self.payer)
+        self.assertEqual(invoice.transaction_number, self.payment_transaction)
+        self.assertEqual(str(invoice), "請求者：3000円（支払済み）")
+
+    def test_invoice_number_is_uuid(self):
+        invoice = Invoice.objects.create(
+            invoice_amount=100, account_number=self.issuer
+        )
+
+        self.assertIsInstance(invoice.invoice_number, uuid.UUID)
+        self.assertEqual(Invoice.objects.get(pk=str(invoice.pk)), invoice)
+
+    def test_invoice_amount_cannot_be_zero_or_less(self):
+        for amount in (0, -1):
+            with self.subTest(amount=amount):
+                invoice = Invoice(
+                    invoice_amount=amount, account_number=self.issuer
+                )
+                with self.assertRaises(ValidationError):
+                    invoice.full_clean()
+                with self.assertRaises(IntegrityError), transaction.atomic():
+                    Invoice.objects.create(
+                        invoice_amount=amount, account_number=self.issuer
+                    )
+
+    def test_unknown_invoice_flag_is_rejected(self):
+        invoice = Invoice(
+            invoice_amount=100,
+            account_number=self.issuer,
+            invoice_flag="unknown",
+        )
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Invoice.objects.create(
+                invoice_amount=100,
+                account_number=self.issuer,
+                invoice_flag="unknown",
+            )
+
+    def test_unknown_issuer_account_is_rejected(self):
+        invoice = Invoice(invoice_amount=100, account_number_id="9999999")
+
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_unpaid_invoice_rejects_paid_time(self):
+        invoice = Invoice(
+            invoice_amount=100,
+            account_number=self.issuer,
+            paid_time=timezone.now(),
+        )
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_unpaid_invoice_rejects_paid_by(self):
+        invoice = Invoice(
+            invoice_amount=100,
+            account_number=self.issuer,
+            paid_by=self.payer,
+        )
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_unpaid_invoice_rejects_transaction_number(self):
+        invoice = Invoice(
+            invoice_amount=100,
+            account_number=self.issuer,
+            transaction_number=self.payment_transaction,
+        )
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_paid_invoice_requires_paid_time(self):
+        invoice = self._paid_invoice(paid_time=None)
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_paid_invoice_requires_paid_by(self):
+        invoice = self._paid_invoice(paid_by=None)
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_paid_invoice_requires_transaction_number(self):
+        invoice = self._paid_invoice(transaction_number=None)
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+
+    def test_issuer_and_payer_cannot_be_same(self):
+        invoice = self._paid_invoice(paid_by=self.issuer)
+        with self.assertRaises(ValidationError):
+            invoice.full_clean()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Invoice.objects.create(
+                invoice_amount=3000,
+                account_number=self.issuer,
+                invoice_flag=Invoice.InvoiceFlag.PAID,
+                paid_time=timezone.now(),
+                paid_by=self.issuer,
+                transaction_number=self.payment_transaction,
+            )
+
+    def test_transaction_cannot_be_linked_to_multiple_invoices(self):
+        first = self._paid_invoice()
+        first.full_clean()
+        first.save()
+        second = self._paid_invoice(invoice_number=uuid.uuid4())
+
+        with self.assertRaises(ValidationError):
+            second.full_clean()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Invoice.objects.create(
+                invoice_amount=3000,
+                account_number=self.other,
+                invoice_flag=Invoice.InvoiceFlag.PAID,
+                paid_time=timezone.now(),
+                paid_by=self.payer,
+                transaction_number=self.payment_transaction,
+            )
+
+
 class SeedMockDataCommandTests(TestCase):
     """共有JSONの投入、更新、ロールバック、安全なresetを確認するテスト。"""
     def setUp(self):
@@ -136,6 +315,28 @@ class SeedMockDataCommandTests(TestCase):
                     "message": "テストデータ",
                 }
             ],
+            "invoices": [
+                {
+                    "invoice_number": "55555555-5555-4555-8555-555555555555",
+                    "invoice_amount": 500,
+                    "message": "未払いテスト",
+                    "account_number": "3000002",
+                    "invoice_flag": "notpay",
+                    "paid_time": None,
+                    "paid_by": None,
+                    "transaction_number": None,
+                },
+                {
+                    "invoice_number": "66666666-6666-4666-8666-666666666666",
+                    "invoice_amount": 500,
+                    "message": "支払済みテスト",
+                    "account_number": "3000002",
+                    "invoice_flag": "paid",
+                    "paid_time": "2026-08-05T15:00:00+09:00",
+                    "paid_by": "3000001",
+                    "transaction_number": "33333333-3333-4333-8333-333333333333",
+                },
+            ],
         }
 
     def _write_data(self, data):
@@ -156,29 +357,47 @@ class SeedMockDataCommandTests(TestCase):
 
         self.assertEqual(Account.objects.count(), 2)
         self.assertEqual(Transaction.objects.count(), 1)
+        self.assertEqual(Invoice.objects.count(), 2)
         self.assertIn("Account：新規2件，更新0件", output)
         self.assertIn("Transaction：新規1件，更新0件", output)
+        self.assertIn("Invoice：新規2件，更新0件", output)
 
     def test_second_run_does_not_increase_record_count(self):
         self._seed()
         created_at = Transaction.objects.get().created_at
+        invoice_created_time = Invoice.objects.get(
+            pk="55555555-5555-4555-8555-555555555555"
+        ).created_time
         output = self._seed()
 
         self.assertEqual(Account.objects.count(), 2)
         self.assertEqual(Transaction.objects.count(), 1)
+        self.assertEqual(Invoice.objects.count(), 2)
         self.assertEqual(Transaction.objects.get().created_at, created_at)
+        self.assertEqual(
+            Invoice.objects.get(
+                pk="55555555-5555-4555-8555-555555555555"
+            ).created_time,
+            invoice_created_time,
+        )
         self.assertIn("Account：新規0件，更新2件", output)
         self.assertIn("Transaction：新規0件，更新1件", output)
+        self.assertIn("Invoice：新規0件，更新2件", output)
 
     def test_changed_json_updates_existing_data(self):
         data = self._default_data()
         self._seed(data)
         data["accounts"][0]["user_name"] = "更新済み"
         data["transactions"][0]["transfer_amount"] = 900
+        data["invoices"][0]["invoice_amount"] = 900
+        data["invoices"][0]["message"] = "更新済み請求"
         self._seed(data)
 
         self.assertEqual(Account.objects.get(pk="3000001").user_name, "更新済み")
         self.assertEqual(Transaction.objects.get().transfer_amount, 900)
+        invoice = Invoice.objects.get(pk="55555555-5555-4555-8555-555555555555")
+        self.assertEqual(invoice.invoice_amount, 900)
+        self.assertEqual(invoice.message, "更新済み請求")
 
     def test_transaction_with_unknown_account_is_not_registered(self):
         existing = Account.objects.create(
@@ -193,6 +412,7 @@ class SeedMockDataCommandTests(TestCase):
 
         self.assertTrue(Account.objects.filter(pk=existing.pk).exists())
         self.assertEqual(Transaction.objects.count(), 0)
+        self.assertEqual(Invoice.objects.count(), 0)
 
     def test_error_rolls_back_accounts_created_before_failure(self):
         data = self._default_data()
@@ -203,6 +423,18 @@ class SeedMockDataCommandTests(TestCase):
 
         self.assertEqual(Account.objects.count(), 0)
         self.assertEqual(Transaction.objects.count(), 0)
+        self.assertEqual(Invoice.objects.count(), 0)
+
+    def test_invalid_invoice_rolls_back_all_mock_data(self):
+        data = self._default_data()
+        data["invoices"][1]["paid_by"] = "3999999"
+
+        with self.assertRaisesMessage(CommandError, "paid_by"):
+            self._seed(data)
+
+        self.assertEqual(Account.objects.count(), 0)
+        self.assertEqual(Transaction.objects.count(), 0)
+        self.assertEqual(Invoice.objects.count(), 0)
 
     def test_reset_recreates_only_json_target_data(self):
         self._seed()
@@ -212,8 +444,22 @@ class SeedMockDataCommandTests(TestCase):
         self.assertEqual(Account.objects.get(pk="3000001").user_name, "開発一郎")
         self.assertEqual(Account.objects.count(), 2)
         self.assertEqual(Transaction.objects.count(), 1)
+        self.assertEqual(Invoice.objects.count(), 2)
         self.assertIn("Account：新規2件，更新0件", output)
         self.assertIn("Transaction：新規1件，更新0件", output)
+        self.assertIn("Invoice：新規2件，更新0件", output)
+
+    def test_reset_recreates_json_invoices(self):
+        self._seed()
+        target = Invoice.objects.get(pk="55555555-5555-4555-8555-555555555555")
+        original_created_time = target.created_time
+        Invoice.objects.filter(pk=target.pk).update(message="手動変更")
+
+        self._seed(reset=True)
+
+        recreated = Invoice.objects.get(pk=target.pk)
+        self.assertEqual(recreated.message, "未払いテスト")
+        self.assertNotEqual(recreated.created_time, original_created_time)
 
     def test_reset_does_not_delete_data_absent_from_json(self):
         self._seed()
@@ -230,6 +476,12 @@ class SeedMockDataCommandTests(TestCase):
             recipient=manual_recipient,
             transfer_amount=100,
         )
+        manual_invoice_number = uuid.uuid4()
+        Invoice.objects.create(
+            invoice_number=manual_invoice_number,
+            invoice_amount=100,
+            account_number=manual_sender,
+        )
 
         self._seed(reset=True)
 
@@ -237,6 +489,227 @@ class SeedMockDataCommandTests(TestCase):
         self.assertTrue(Account.objects.filter(pk="3999999").exists())
         self.assertTrue(
             Transaction.objects.filter(pk=manual_transaction_number).exists()
+        )
+        self.assertTrue(Invoice.objects.filter(pk=manual_invoice_number).exists())
+
+    def test_invoices_must_be_a_list(self):
+        data = self._default_data()
+        data["invoices"] = {}
+
+        with self.assertRaisesMessage(CommandError, "invoicesは配列"):
+            self._seed(data)
+
+    def test_invoice_validation_message_identifies_number_and_field(self):
+        data = self._default_data()
+        data["invoices"][0]["invoice_amount"] = 0
+
+        with self.assertRaisesMessage(
+            CommandError,
+            "55555555-5555-4555-8555-555555555555）.invoice_amount",
+        ):
+            self._seed(data)
+
+
+class InvoiceAPITests(APITestCase):
+    """請求の作成・取得・支払い・一覧がSQLiteと連携することを確認する。"""
+
+    def setUp(self):
+        self.issuer = Account.objects.create(
+            account_number="5000001",
+            user_name="請求元",
+            account_balance=1000,
+        )
+        self.payer = Account.objects.create(
+            account_number="5000002",
+            user_name="支払元",
+            account_balance=10000,
+        )
+
+    def _create_invoice(self, amount=3000, message="会食代"):
+        return Invoice.objects.create(
+            invoice_amount=amount,
+            message=message,
+            account_number=self.issuer,
+        )
+
+    def _payment_data(self, invoice, **overrides):
+        data = {
+            "my_account_number": self.payer.account_number,
+            "invoice_account_number": self.issuer.account_number,
+            "invoice_amount": str(invoice.invoice_amount),
+            "message": "請求支払い",
+        }
+        data.update(overrides)
+        return data
+
+    def test_invoice_request_creates_database_record_and_link(self):
+        response = self.client.post(
+            "/api/user/5000001/invoice_request",
+            {"invoice_amount": 2500, "message": "夕食代"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        invoice = Invoice.objects.get()
+        self.assertEqual(invoice.invoice_amount, 2500)
+        self.assertEqual(invoice.message, "夕食代")
+        self.assertEqual(invoice.account_number, self.issuer)
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.NOTPAY)
+        self.assertIsNotNone(invoice.created_time)
+        self.assertEqual(
+            response.data["invoice_link"],
+            f"http://localhost:3000/invoice/{invoice.invoice_number}",
+        )
+
+    def test_invoice_request_rejects_invalid_amount(self):
+        for amount in (0, -1, "3000"):
+            with self.subTest(amount=amount):
+                response = self.client.post(
+                    "/api/user/5000001/invoice_request",
+                    {"invoice_amount": amount},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+        self.assertEqual(Invoice.objects.count(), 0)
+
+    def test_invoice_info_reads_database_record(self):
+        invoice = self._create_invoice()
+
+        response = self.client.get(f"/api/{invoice.invoice_number}/get_inf")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["invoice_account_number"], "5000001")
+        self.assertEqual(response.data["invoice_amount"], "3000")
+        self.assertEqual(response.data["invoice_message"], "会食代")
+        self.assertEqual(response.data["invoice_flag"], "notpay")
+
+    def test_invoice_info_rejects_invalid_uuid(self):
+        response = self.client.get("/api/not-a-uuid/get_inf")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_invoice_payment_updates_all_related_records_atomically(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.issuer.refresh_from_db()
+        self.payer.refresh_from_db()
+        invoice.refresh_from_db()
+        transfer = Transaction.objects.get()
+        self.assertEqual(self.issuer.account_balance, 4000)
+        self.assertEqual(self.payer.account_balance, 7000)
+        self.assertEqual(transfer.sender, self.payer)
+        self.assertEqual(transfer.recipient, self.issuer)
+        self.assertEqual(transfer.transfer_amount, 3000)
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.PAID)
+        self.assertEqual(invoice.paid_by, self.payer)
+        self.assertEqual(invoice.transaction_number, transfer)
+        self.assertEqual(invoice.paid_time, transfer.created_at)
+
+    def test_invoice_payment_rejects_tampered_amount_without_changes(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice, invoice_amount="1"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+        self.payer.refresh_from_db()
+        self.assertEqual(self.payer.account_balance, 10000)
+
+    def test_invoice_payment_rejects_tampered_issuer_without_changes(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice, invoice_account_number="5000002"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_paid_invoice_cannot_be_paid_twice(self):
+        invoice = self._create_invoice()
+        payment_data = self._payment_data(invoice)
+        self.client.post(
+            f"/api/{invoice.invoice_number}/pay", payment_data, format="json"
+        )
+
+        second_response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay", payment_data, format="json"
+        )
+
+        self.assertEqual(second_response.status_code, 409)
+        self.assertEqual(Transaction.objects.count(), 1)
+
+    def test_invoice_payment_rejects_insufficient_balance(self):
+        invoice = self._create_invoice(amount=10001)
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.NOTPAY)
+
+    def test_invoice_payment_rejects_missing_invoice(self):
+        missing_invoice_number = uuid.uuid4()
+        response = self.client.post(
+            f"/api/{missing_invoice_number}/pay",
+            {
+                "my_account_number": "5000002",
+                "invoice_account_number": "5000001",
+                "invoice_amount": "3000",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_invoice_payment_rejects_issuer_as_payer(self):
+        invoice = self._create_invoice()
+
+        response = self.client.post(
+            f"/api/{invoice.invoice_number}/pay",
+            self._payment_data(invoice, my_account_number="5000001"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_invoice_list_reads_database_in_newest_first_order(self):
+        older = self._create_invoice(message="古い請求")
+        newer = self._create_invoice(message="新しい請求")
+        Invoice.objects.filter(pk=older.pk).update(
+            created_time=timezone.now() - timedelta(days=1)
+        )
+
+        response = self.client.get("/api/user/5000001/invoice_list")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["invoice_number"] for item in response.data["invoice_list"]],
+            [str(newer.invoice_number), str(older.invoice_number)],
+        )
+        self.assertRegex(
+            response.data["invoice_list"][0]["invoice_time"],
+            r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$",
         )
 
 

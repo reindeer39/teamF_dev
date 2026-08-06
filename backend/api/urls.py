@@ -7,6 +7,10 @@ config/urls.pyが`/api/`を取り除いた残りのURLをこのファイルへ�
 from django.urls import path
 
 from api.views import (
+    InvoiceInfoView,
+    InvoiceListView,
+    InvoicePayView,
+    InvoiceRequestView,
     RecipientInfoView,
     RecipientListView,
     TransferView,
@@ -37,5 +41,29 @@ urlpatterns = [
         "user/<str:sender_account_number>/<str:recipient_account_number>/transfer",
         TransferView.as_view(),
         name="transfer",
+    ),
+    # POST。請求リクエストを発行するView。
+    path(
+        "user/<str:account_number>/invoice_request",
+        InvoiceRequestView.as_view(),
+        name="invoice-request",
+    ),
+    # GET。請求情報を取得するView。
+    path(
+        "<str:invoice_number>/get_inf",
+        InvoiceInfoView.as_view(),
+        name="invoice-info",
+    ),
+    # POST。請求の支払い処理を行うView。
+    path(
+        "<str:invoice_number>/pay",
+        InvoicePayView.as_view(),
+        name="invoice-pay",
+    ),
+    # GET。指定ユーザが作成した請求リストを取得するView。
+    path(
+        "user/<str:account_number>/invoice_list",
+        InvoiceListView.as_view(),
+        name="invoice-list-user",
     ),
 ]
