@@ -77,21 +77,24 @@ function AppNavigator() {
   if (currentScreen === 'transfer' && selectedRecipient) {
     return (
       <AppLayout
-        title="送金"
-        onBack={() => setCurrentScreen('recipients')}
-        showTopBar={!isTransferComplete}
+        title={isTransferComplete ? '送金完了' : '送金'}
+        onBack={() => {
+          if (isTransferComplete) {
+            setSelectedRecipient(null);
+            setIsTransferComplete(false);
+            setCurrentScreen('profile');
+            setReloadCount((count) => count + 1);
+            return;
+          }
+
+          setCurrentScreen('recipients');
+        }}
       >
       <ProcessSendMoney
         senderAccountNumber={ACCOUNT_NUMBER}
         recipientAccountNumber={selectedRecipient.account_number}
         accountBalance={account?.account_balance || 0}
         onTransferSuccess={() => setIsTransferComplete(true)}
-        onTransferComplete={() => {
-          setSelectedRecipient(null);
-          setIsTransferComplete(false);
-          setCurrentScreen('profile');
-          setReloadCount((count) => count + 1);
-        }}
       />
       </AppLayout>
     );

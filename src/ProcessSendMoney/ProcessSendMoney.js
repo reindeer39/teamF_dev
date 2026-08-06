@@ -11,7 +11,6 @@ function ProcessSendMoney({
   recipientAccountNumber,
   accountBalance,
   onTransferSuccess,
-  onTransferComplete,
 }) {
   const [recipient, setRecipient] = useState(null);
   const [amount, setAmount] = useState('');
@@ -77,12 +76,18 @@ function ProcessSendMoney({
   if (result) {
     return (
       <main className="send-money-screen transfer-complete">
-        <h1>送金が完了しました</h1>
-        <p>{result.transfer_amount.toLocaleString('ja-JP')}円を送金しました。</p>
-        <p>取引番号：{result.transaction_number}</p>
-        <button type="button" className="send-button" onClick={onTransferComplete}>
-          トップへ戻る
-        </button>
+        <section className="transfer-complete__card">
+          <span className="transfer-complete__icon" aria-hidden="true">✓</span>
+          <h1>送金が完了しました</h1>
+          <p className="transfer-complete__guide">正常に送金処理が完了しました。</p>
+          <div className="transfer-complete__summary">
+            <span>送金金額</span>
+            <strong>{result.transfer_amount.toLocaleString('ja-JP')}円</strong>
+          </div>
+          <p className="transfer-complete__transaction">
+            取引番号：{result.transaction_number}
+          </p>
+        </section>
       </main>
     );
   }
