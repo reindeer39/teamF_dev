@@ -186,13 +186,13 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
   {
     "invoice_list": [
       {
-        "invoice_time": "2026-08-06 10:53",
+        "invoice_time": "2026-08-06 10:53:25.573786",
         "invoice_flag": "notpay",
         "paid_by": null,
         "invoice_number": "33333333-3333-4333-8333-333333333333"
       },
       {
-        "invoice_time": "2026-08-05 18:30",
+        "invoice_time": "2026-08-05 18:30:04.123456",
         "invoice_flag": "paid",
         "paid_by": "654321",
         "invoice_number": "11111111-1111-4111-8111-111111111111"
@@ -200,7 +200,7 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
     ]
   }
   ```
-  * `invoice_time`: 請求作成日時を `YYYY-MM-DD HH:MM` 形式（分まで）に加工。
+  * `invoice_time`: 請求作成日時を `YYYY-MM-DD HH:MM:SS.ffffff`形式（マイクロ秒まで）に加工。
   * リスト内の並び順: 請求作成日時 (`created_time`) が**新しいものが先頭になる降順（`order_by("-created_time")`）**。
   * `paid_by`: 未払いの場合は `null`。
 * **Response 404 Not Found**:

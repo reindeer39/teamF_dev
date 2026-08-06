@@ -709,7 +709,7 @@ class InvoiceAPITests(APITestCase):
         )
         self.assertRegex(
             response.data["invoice_list"][0]["invoice_time"],
-            r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$",
+            r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$",
         )
 
 

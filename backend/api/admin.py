@@ -56,8 +56,8 @@ class InvoiceAdmin(admin.ModelAdmin):
         "invoice_amount",
         "invoice_flag",
         "paid_by",
-        "created_time",
-        "paid_time",
+        "formatted_created_time",
+        "formatted_paid_time",
     )
     search_fields = (
         "invoice_number",
@@ -70,3 +70,15 @@ class InvoiceAdmin(admin.ModelAdmin):
     )
     list_filter = ("invoice_flag", "created_time", "paid_time")
     readonly_fields = ("invoice_number", "created_time")
+
+    @admin.display(ordering="created_time", description="created_time")
+    def formatted_created_time(self, obj):
+        if not obj.created_time:
+            return ""
+        return timezone.localtime(obj.created_time).strftime("%Y-%m-%d %H:%M:%S.%f")
+
+    @admin.display(ordering="paid_time", description="paid_time")
+    def formatted_paid_time(self, obj):
+        if not obj.paid_time:
+            return ""
+        return timezone.localtime(obj.paid_time).strftime("%Y-%m-%d %H:%M:%S.%f")

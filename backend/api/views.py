@@ -367,7 +367,7 @@ class InvoiceListView(APIView):
         invoice_list = [
             {
                 "invoice_time": timezone.localtime(invoice.created_time).strftime(
-                    "%Y-%m-%d %H:%M"
+                    "%Y-%m-%d %H:%M:%S.%f"
                 ),
                 "invoice_flag": invoice.invoice_flag,
                 "paid_by": invoice.paid_by_id,
