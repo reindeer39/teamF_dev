@@ -2,14 +2,7 @@ import './TopScreen.css';
 import icon from '../images/human1.png';
 import NavigationButton from '../components/NavigationButton';
 
-function TopScreen({
-  account,
-  loading,
-  error,
-  onSelectRecipient,
-  onInvoice,
-  onInvoiceStatus,
-}) {
+function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceStatus,}) {
   const buttonWidth = '80vw';
   const buttonHeight = '7vh';
   const buttonColor = '#316745';
