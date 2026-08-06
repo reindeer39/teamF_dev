@@ -3,24 +3,31 @@ import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
 import NextScreen from '../NextScreen/NextScreen';
-import { ACCOUNT_NUMBER } from '../account';
-import { getUserSummary } from '../api/users';
+import AuthScreen from '../auth/AuthScreen';
+import { useAuth } from '../auth/AuthContext';
+import { getMySummary } from '../api/accounts';
 
 function AppNavigator() {
+  const { session, initializing, login, signup, signOut } = useAuth();
   const [currentScreen, setCurrentScreen] = useState('profile');
-  const [account, setAccount] = useState(null);
+  const [account, setAccount] = useState(session?.account || null);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
+    if (!session) {
+      setAccount(null);
+      return undefined;
+    }
+
     let active = true;
     setLoading(true);
     setError('');
 
     // API連携ポイント: 画面表示時と送金完了後に最新残高をDBから再取得する。
-    getUserSummary(ACCOUNT_NUMBER)
+    getMySummary()
       .then((data) => {
         if (active) setAccount(data);
       })
@@ -34,12 +41,19 @@ function AppNavigator() {
     return () => {
       active = false;
     };
-  }, [reloadCount]);
+  }, [reloadCount, session]);
+
+  if (initializing) {
+    return <p className="screen-message">ログイン状態を確認しています...</p>;
+  }
+
+  if (!session) {
+    return <AuthScreen onLogin={login} onSignup={signup} />;
+  }
 
   if (currentScreen === 'recipients') {
     return (
       <SelectSendMoney
-        senderAccountNumber={ACCOUNT_NUMBER}
         onBack={() => setCurrentScreen('profile')}
         onSelectRecipient={(recipient) => {
           setSelectedRecipient(recipient);
@@ -52,7 +66,6 @@ function AppNavigator() {
   if (currentScreen === 'transfer' && selectedRecipient) {
     return (
       <ProcessSendMoney
-        senderAccountNumber={ACCOUNT_NUMBER}
         recipientAccountNumber={selectedRecipient.account_number}
         accountBalance={account?.account_balance || 0}
         onBack={() => setCurrentScreen('recipients')}
@@ -76,6 +89,7 @@ function AppNavigator() {
       error={error}
       onSelectRecipient={() => setCurrentScreen('recipients')}
       onBilling={() => setCurrentScreen('billing')}
+      onLogout={signOut}
     />
   );
 }

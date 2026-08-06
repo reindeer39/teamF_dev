@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework.authtoken",
     "rest_framework",  # Pythonの辞書をJSONレスポンスへ変換するAPI基盤。
     "corsheaders",  # React開発サーバーからのAPIアクセスを許可する。
     "api",  # Account、Transaction、各APIを持つ既存アプリ。
@@ -59,6 +60,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+}
 
 ROOT_URLCONF = "config.urls"
 

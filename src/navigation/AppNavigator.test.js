@@ -1,13 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AppNavigator from './AppNavigator';
-import {
-  createTransfer,
-  getRecipientInfo,
-  getRecipientList,
-  getUserSummary,
-} from '../api/users';
+import { getMySummary, getRecipientInfo, getRecipientList } from '../api/accounts';
+import { createTransfer } from '../api/transfers';
+import { useAuth } from '../auth/AuthContext';
 
-jest.mock('../api/users');
+jest.mock('../api/accounts');
+jest.mock('../api/transfers');
+jest.mock('../auth/AuthContext');
 
 const summary = {
   account_number: '1000001',
@@ -18,7 +17,14 @@ const summary = {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getUserSummary.mockResolvedValue(summary);
+  useAuth.mockReturnValue({
+    session: { username: 'yamada', account: summary },
+    initializing: false,
+    login: jest.fn(),
+    signup: jest.fn(),
+    signOut: jest.fn(),
+  });
+  getMySummary.mockResolvedValue(summary);
   getRecipientList.mockResolvedValue({
     recipient_list: [
       {
@@ -50,9 +56,11 @@ test('DBから取得した口座情報と操作ボタンを表示する', async 
 
   expect(await screen.findByText('山田太郎')).toBeInTheDocument();
   expect(screen.getByText('97,000円')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: '送金する' })).toBeEnabled();
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '送金する' })).toBeEnabled();
+  });
   expect(screen.getByRole('button', { name: '請求する' })).toBeInTheDocument();
-  expect(getUserSummary).toHaveBeenCalledWith('1000001');
+  expect(getMySummary).toHaveBeenCalledWith();
 });
 
 test('送金ボタンからAPIを呼び出して送金完了まで遷移する', async () => {
@@ -73,7 +81,6 @@ test('送金ボタンからAPIを呼び出して送金完了まで遷移する',
 
   await waitFor(() => {
     expect(createTransfer).toHaveBeenCalledWith(
-      '1000001',
       '1000002',
       3000,
       '昼食代'
@@ -81,4 +88,20 @@ test('送金ボタンからAPIを呼び出して送金完了まで遷移する',
   });
   expect(await screen.findByText('送金が完了しました')).toBeInTheDocument();
   expect(screen.getByText(/33333333-3333-4333-8333-333333333333/)).toBeInTheDocument();
+});
+
+test('未ログイン時はログイン画面を表示する', () => {
+  useAuth.mockReturnValue({
+    session: null,
+    initializing: false,
+    login: jest.fn(),
+    signup: jest.fn(),
+    signOut: jest.fn(),
+  });
+
+  render(<AppNavigator />);
+
+  expect(screen.getByRole('heading', { name: 'ログイン' })).toBeInTheDocument();
+  expect(screen.getByLabelText('ログインID')).toBeInTheDocument();
+  expect(screen.getByLabelText('パスワード')).toBeInTheDocument();
 });
