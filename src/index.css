@@ -7,6 +7,10 @@
   --app-hover-color: #e5e7e6;
   --app-top-bar-color: #dceadf;
   --app-top-bar-height: clamp(56px, 9vh, 76px);
+  --app-content-width: min(88vw, 560px);
+  --app-card-radius: 16px;
+  --app-control-radius: 10px;
+  --app-section-gap: clamp(20px, 4vh, 32px);
 }
 
 html,

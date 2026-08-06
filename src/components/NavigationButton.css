@@ -6,7 +6,7 @@
   box-sizing: border-box;
   padding: 25px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--app-control-radius);
   background-color: var(--button-background-color, #316745);
   color: var(--button-text-color, #ffffff);
   font-size: 1rem;

@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import NavigationButton from '../components/NavigationButton';
 import './CopyInvoiceLink.css';
 
 function CopyInvoiceLink({
   invoiceLink = '',
-  onBack = () => {},
 }) {
   const [copyMessage, setCopyMessage] = useState('');
 
@@ -31,9 +29,6 @@ function CopyInvoiceLink({
         <p aria-live="polite">{copyMessage}</p>
       </div>
 
-      <div className="copy-invoice-link__top-button">
-        <NavigationButton onClick={onBack}>トップに戻る</NavigationButton>
-      </div>
     </main>
   );
 }

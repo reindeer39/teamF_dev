@@ -1,5 +1,5 @@
 .top-screen {
-  min-height: 100vh;
+  min-height: calc(100dvh - var(--app-top-bar-height));
   box-sizing: border-box;
   padding-top: 6vh;
   background-color: var(--app-background-color);
@@ -11,13 +11,13 @@
   align-items: center;
   justify-content: center;
   gap: 24px;
-  width: 85vw;
+  width: var(--app-content-width);
   box-sizing: border-box;
   margin: 0 auto;
   padding: 24px;
-  border: 2px solid #333333;
-  border-radius: 16px;
-  background-color: var(--app-background-color);
+  border: 1px solid var(--app-border-color);
+  border-radius: var(--app-card-radius);
+  background-color: var(--app-surface-color);
 }
 
 .user-profile__main {

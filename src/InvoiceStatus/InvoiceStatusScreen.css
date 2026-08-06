@@ -32,8 +32,7 @@
 }
 
 .invoice-status-panel {
-  width: 85vw;
-  max-width: 80vh;
+  width: var(--app-content-width);
   box-sizing: border-box;
   padding: clamp(12px, 3vmin, 24px);
   background-color: var(--app-background-color);
@@ -133,7 +132,7 @@
   padding:
     clamp(10px, 2vmin, 14px)
     clamp(12px, 2.5vmin, 16px);
-  border-radius: clamp(8px, 1.5vmin, 12px);
+  border-radius: var(--app-control-radius);
   background-color: #e8f0eb;
   font-size: clamp(1rem, 4vw, 1.35rem);
 }
@@ -173,7 +172,7 @@
   padding:
     clamp(10px, 1.8vmin, 14px)
     clamp(12px, 2.5vmin, 18px);
-  border-radius: clamp(6px, 1vmin, 10px);
+  border-radius: var(--app-control-radius);
   background-color: #eeeeee;
 }
 

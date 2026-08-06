@@ -16,7 +16,7 @@
 .make-invoice-link__submit {
   position: absolute;
   left: 50%;
-  width: min(80vw, 500px);
+  width: var(--app-content-width);
   transform: translate(-50%, -50%);
 }
 
@@ -41,8 +41,8 @@
   display: flex;
   align-items: center;
   border: 1px solid #999999;
-  border-radius: 8px;
-  background-color: #ffffff;
+  border-radius: var(--app-control-radius);
+  background-color: var(--app-surface-color);
 }
 
 .make-invoice-link__amount-box input {

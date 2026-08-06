@@ -9,6 +9,7 @@ function ProcessSendMoney({
   senderAccountNumber,
   recipientAccountNumber,
   accountBalance,
+  onTransferSuccess,
   onTransferComplete,
 }) {
   const [recipient, setRecipient] = useState(null);
@@ -64,6 +65,7 @@ function ProcessSendMoney({
         message
       );
       setResult(transferResult);
+      onTransferSuccess?.();
     } catch (apiError) {
       setError(`送金できませんでした: ${apiError.message}`);
     } finally {

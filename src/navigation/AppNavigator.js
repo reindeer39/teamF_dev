@@ -16,6 +16,7 @@ function AppNavigator() {
   const [currentScreen, setCurrentScreen] = useState('profile');
   const [account, setAccount] = useState(null);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
+  const [isTransferComplete, setIsTransferComplete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
@@ -65,6 +66,7 @@ function AppNavigator() {
         senderAccountNumber={ACCOUNT_NUMBER}
         onSelectRecipient={(recipient) => {
           setSelectedRecipient(recipient);
+          setIsTransferComplete(false);
           setCurrentScreen('transfer');
         }}
       />
@@ -74,13 +76,19 @@ function AppNavigator() {
 
   if (currentScreen === 'transfer' && selectedRecipient) {
     return (
-      <AppLayout title="送金" onBack={() => setCurrentScreen('recipients')}>
+      <AppLayout
+        title="送金"
+        onBack={() => setCurrentScreen('recipients')}
+        showTopBar={!isTransferComplete}
+      >
       <ProcessSendMoney
         senderAccountNumber={ACCOUNT_NUMBER}
         recipientAccountNumber={selectedRecipient.account_number}
         accountBalance={account?.account_balance || 0}
+        onTransferSuccess={() => setIsTransferComplete(true)}
         onTransferComplete={() => {
           setSelectedRecipient(null);
+          setIsTransferComplete(false);
           setCurrentScreen('profile');
           setReloadCount((count) => count + 1);
         }}
@@ -109,7 +117,6 @@ function AppNavigator() {
       <AppLayout title="請求リンク" onBack={() => setCurrentScreen('profile')}>
       <CopyInvoiceLink
         invoiceLink={invoiceLink}
-        onBack={() => setCurrentScreen('profile')}
       />
       </AppLayout>
     );
