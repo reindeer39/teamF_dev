@@ -1,32 +1,99 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { getUserSummary } from '../api/users';
+import human1 from '../images/human1.png';
 import './BillingStatusScreen.css';
+
+const USER_ICONS = {
+  'user1.png': human1,
+};
 
 const BILLING_REQUESTS = [
   {
-    id: 'request-1',
-    date: '2026年8月5日',
-    status: '支払済み',
-    userName: '山田 太郎',
-    amount: 100000,
-    message: '8月分の請求です。',
+    invoiced_at: '2026-08-05 12:30:00.000000',
+    payment_flag: 'pay',
+    payer_account_number: '1000001',
+    invoice_number: 'invoice-001',
   },
   {
-    id: 'request-2',
-    date: '2026年7月20日',
-    status: '支払済み',
-    userName: '佐藤 花子',
-    amount: 100000,
-    message: '昼食代の請求です。',
+    invoiced_at: '2026-07-20 09:15:00.000000',
+    payment_flag: 'notpay',
+    payer_account_number: null,
+    invoice_number: 'invoice-002',
   },
 ];
 
-function BillingStatusScreen({ onBack }) {
-  const [openRequestId, setOpenRequestId] = useState('request-2');
+const INVOICE_DETAILS = {
+  'invoice-001': {
+    message: '8月分の請求です。',
+    invoice_amount: 100000,
+  },
+  'invoice-002': {
+    message: 'hogehogehogehogehoeegehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehoge',
+    invoice_amount: 100000,
+  },
+};
 
-  const toggleRequest = (requestId) => {
-    setOpenRequestId((currentId) =>
-      currentId === requestId ? null : requestId
+function resolveUserIcon(iconPath) {
+  if (!iconPath) return '';
+
+  const normalizedPath = iconPath.replaceAll('\\', '/');
+  const fileName = normalizedPath.split('/').pop();
+  return USER_ICONS[fileName] || normalizedPath;
+}
+
+function formatInvoiceTime(invoiceTime) {
+  return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
+}
+
+function BillingStatusScreen({ onBack }) {
+  const [openInvoiceNumber, setOpenInvoiceNumber] = useState(null);
+  const [payer, setPayer] = useState(null);
+  const [payerLoading, setPayerLoading] = useState(false);
+  const [payerError, setPayerError] = useState('');
+
+  useEffect(() => {
+    const openInvoice = BILLING_REQUESTS.find(
+      (invoice) => invoice.invoice_number === openInvoiceNumber
     );
+
+    setPayer(null);
+    setPayerError('');
+
+    if (!openInvoice?.payer_account_number) {
+      setPayerLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    setPayerLoading(true);
+
+    getUserSummary(openInvoice.payer_account_number)
+      .then((data) => {
+        if (active) setPayer(data);
+      })
+      .catch((apiError) => {
+        if (active) {
+          setPayerError(`支払人情報を取得できませんでした: ${apiError.message}`);
+        }
+      })
+      .finally(() => {
+        if (active) setPayerLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [openInvoiceNumber]);
+
+  const toggleInvoice = (invoice) => {
+    const invoiceNumber = invoice.invoice_number;
+
+    if (openInvoiceNumber === invoiceNumber) {
+      setOpenInvoiceNumber(null);
+      return;
+    }
+
+    setOpenInvoiceNumber(invoiceNumber);
   };
 
   return (
@@ -45,42 +112,99 @@ function BillingStatusScreen({ onBack }) {
         </header>
 
         <div className="billing-list">
-          {BILLING_REQUESTS.map((request) => {
-            const isOpen = openRequestId === request.id;
-            const detailsId = `${request.id}-details`;
+          {BILLING_REQUESTS.map((invoice) => {
+            const invoiceNumber = invoice.invoice_number;
+            const isOpen = openInvoiceNumber === invoiceNumber;
+            const invoiceInfo = INVOICE_DETAILS[invoiceNumber];
+            const detailsId = `invoice-${invoiceNumber}-details`;
+            const invoiceTime = formatInvoiceTime(invoice.invoiced_at);
+            const isPaid = invoice.payment_flag === 'pay';
 
             return (
-              <article className="billing-item" key={request.id}>
+              <article className="billing-item" key={invoiceNumber}>
                 <div className="billing-item-summary">
-                  <time>{request.date}</time>
-                  <span className="billing-item-status">{request.status}</span>
+                  <time dateTime={invoice.invoiced_at?.replace(' ', 'T')}>
+                    {invoiceTime}
+                  </time>
+                  <span
+                    className={`billing-item-status ${
+                      isPaid
+                        ? 'billing-item-status--paid'
+                        : 'billing-item-status--unpaid'
+                    }`}
+                  >
+                    {isPaid ? '支払済み' : '未払い'}
+                  </span>
                   <button
                     className="billing-toggle"
                     type="button"
                     aria-expanded={isOpen}
                     aria-controls={detailsId}
-                    aria-label={`${request.date}の請求詳細を${isOpen ? '閉じる' : '開く'}`}
-                    onClick={() => toggleRequest(request.id)}
+                    aria-label={`${invoiceTime}の請求詳細を${isOpen ? '閉じる' : '開く'}`}
+                    onClick={() => toggleInvoice(invoice)}
                   >
-                    {isOpen ? '△' : '▽'}
+                    <span
+                      className={`billing-toggle-icon ${
+                        isOpen
+                          ? 'billing-toggle-icon--up'
+                          : 'billing-toggle-icon--down'
+                      }`}
+                      aria-hidden="true"
+                    >
+                      &lt;
+                    </span>
                   </button>
                 </div>
 
                 {isOpen && (
                   <div className="billing-item-details" id={detailsId}>
-                    <div className="billing-user-row">
-                      <div className="billing-face" aria-hidden="true">顔</div>
-                      <strong>{request.userName}</strong>
-                    </div>
+                    {invoiceInfo ? (
+                      <>
+                        {isPaid && payerLoading && <p>支払人情報を読み込み中...</p>}
+                        {isPaid && payerError && (
+                          <p className="billing-list-message--error">{payerError}</p>
+                        )}
+                        {payer && (
+                          <div className="billing-user-row">
+                            <span className="billing-payer-label">支払人</span>
+                            <img
+                              className="billing-face"
+                              src={resolveUserIcon(payer.user_icon)}
+                              alt={`${payer.user_name}のアイコン`}
+                            />
+                            <strong>{payer.user_name}</strong>
+                          </div>
+                        )}
 
-                    <p className="billing-amount">
-                      請求金額：{request.amount.toLocaleString('ja-JP')}円
-                    </p>
+                        <div
+                          className={`billing-amount-row ${
+                            isPaid
+                              ? 'billing-amount-row--paid'
+                              : 'billing-amount-row--unpaid'
+                          }`}
+                        >
+                          <p className="billing-amount">
+                            請求金額：
+                            {Number(invoiceInfo.invoice_amount).toLocaleString('ja-JP')}円
+                          </p>
 
-                    <label className="billing-message-label">
-                      メッセージ
-                      <textarea value={request.message} readOnly />
-                    </label>
+                          {!isPaid && (
+                            <button className="billing-copy-link-button" type="button">
+                              リンクをコピー
+                            </button>
+                          )}
+                        </div>
+
+                        <label className="billing-message-label">
+                          メッセージ
+                          <textarea value={invoiceInfo.message || ''} readOnly />
+                        </label>
+                      </>
+                    ) : (
+                      <p className="billing-list-message--error">
+                        請求詳細の仮データが見つかりません。
+                      </p>
+                    )}
                   </div>
                 )}
               </article>

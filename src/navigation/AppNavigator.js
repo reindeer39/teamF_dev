@@ -3,6 +3,7 @@ import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
 import NextScreen from '../NextScreen/NextScreen';
+import BillingStatusScreen from '../BillingStatus/BillingStatusScreen';
 import { ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 
@@ -69,6 +70,14 @@ function AppNavigator() {
     return <NextScreen onBack={() => setCurrentScreen('profile')} />;
   }
 
+  if (currentScreen === 'billingStatus') {
+    return (
+      <BillingStatusScreen
+        onBack={() => setCurrentScreen('profile')}
+      />
+    );
+  }
+
   return (
     <TopScreen
       account={account}
@@ -76,6 +85,7 @@ function AppNavigator() {
       error={error}
       onSelectRecipient={() => setCurrentScreen('recipients')}
       onBilling={() => setCurrentScreen('billing')}
+      onBillingStatus={() => setCurrentScreen('billingStatus')}
     />
   );
 }
