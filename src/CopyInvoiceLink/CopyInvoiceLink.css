@@ -1,3 +1,70 @@
-.tmp{
-  
+.copy-invoice-link {
+  position: relative;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  color: #333333;
+  text-align: center;
+}
+
+.copy-invoice-link__display,
+.copy-invoice-link__copy-area,
+.copy-invoice-link__top-button {
+  position: absolute;
+  left: 50%;
+  width: min(80vw, 500px);
+  transform: translate(-50%, -50%);
+}
+
+.copy-invoice-link__display {
+  top: 20vh;
+}
+
+.copy-invoice-link__display p {
+  margin: 0 0 12px;
+}
+
+.copy-invoice-link__url {
+  overflow-wrap: anywhere;
+}
+
+.copy-invoice-link__copy-area {
+  top: 40vh;
+}
+
+.copy-invoice-link__copy-area button,
+.copy-invoice-link__top-button .navigation-button {
+  height: 54px;
+  border: 0;
+  border-radius: 8px;
+  background-color: #316745;
+  color: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.copy-invoice-link__copy-area button {
+  width: 100%;
+}
+
+.copy-invoice-link__copy-area button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.copy-invoice-link__copy-area p {
+  min-height: 24px;
+  margin: 8px 0 0;
+}
+
+.copy-invoice-link__top-button {
+  top: 70vh;
+}
+
+.copy-invoice-link__top-button .navigation-button {
+  width: 100%;
+  padding: 0;
+}
+
+.copy-invoice-link__top-button .navigation-button:hover {
+  transform: none;
 }
