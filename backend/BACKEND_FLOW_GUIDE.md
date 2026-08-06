@@ -486,18 +486,31 @@ stateに文字列が入ると、次の条件付きJSXが表示されます。
 `AuthScreen`は次を呼びます。
 
 ```js
-onSignup({ email, password, user_name: userName })
+onSignup({
+  account_number: accountNumber,
+  user_name: userName,
+  email,
+  password,
+})
 ```
 
 `SignupView`は`transaction.atomic()`内でDjango UserとAccountを同時作成します。
 
 ```python
 with transaction.atomic():
-    user = User.objects.create_user(...)
+    user = User.objects.create_user(
+        username=normalized_email,
+        email=normalized_email,
+        password=password,
+        is_active=True,
+        is_staff=False,
+        is_superuser=False,
+    )
     account = Account.objects.create(
-        account_number=generate_account_number(),
-        user=user,
-        user_name=user_name,
+        account_number=normalized_account_number,
+        auth_user=user,
+        user_name=normalized_user_name,
+        user_icon="",
         account_balance=0,
     )
     token = Token.objects.create(user=user)

@@ -90,6 +90,16 @@
   color: #b42318;
 }
 
+.auth-form__field-error {
+  margin: -4px 0 2px;
+  color: #b42318;
+  font-size: 0.875rem;
+}
+
+.auth-form input[aria-invalid="true"] {
+  border-color: #b42318;
+}
+
 .auth-submit {
   min-height: 48px;
   margin-top: 14px;

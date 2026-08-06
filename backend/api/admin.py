@@ -13,8 +13,23 @@ from .models import Account, Invoice, Transaction
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
     """口座一覧の表示列と検索対象を設定する。"""
-    list_display = ("account_number", "user_name", "user", "account_balance")
-    search_fields = ("account_number", "user_name", "user__username")
+    list_display = (
+        "account_number",
+        "user_name",
+        "account_balance",
+        "email",
+        "auth_user",
+    )
+    search_fields = (
+        "account_number",
+        "user_name",
+        "auth_user__username",
+        "auth_user__email",
+    )
+
+    @admin.display(description="メールアドレス")
+    def email(self, obj):
+        return obj.auth_user.email if obj.auth_user else "-"
 
 
 @admin.register(Transaction)

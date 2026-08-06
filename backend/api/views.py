@@ -4,14 +4,10 @@
 `Account.objects...`などがDjango ORMによるDB操作、`Response(...)`が
 Reactへ返すJSONレスポンスです。詳しい流れはBACKEND_FLOW_GUIDE.mdを参照。
 """
-import secrets
-
 from django.contrib.auth import authenticate, get_user_model
-from django.contrib.auth.password_validation import validate_password
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import validate_email
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -20,6 +16,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 
 from api.models import Account, Invoice, Transaction
+from api.serializers import SignupSerializer
 
 
 User = get_user_model()
@@ -35,20 +32,20 @@ def account_data(account):
     }
 
 
+def authenticated_account_data(account):
+    """認証API向けにAccount情報と認証Userのメールアドレスを返す。"""
+    return {
+        **account_data(account),
+        "email": account.auth_user.email if account.auth_user else "",
+    }
+
+
 def authenticated_account(request):
     """認証ユーザーに紐づくAccountを取得する。"""
     try:
-        return request.user.account
+        return request.user.bank_account
     except Account.DoesNotExist:
         return None
-
-
-def generate_account_number():
-    """新規登録用の重複しない7桁口座番号を生成する。"""
-    while True:
-        account_number = str(1_000_000 + secrets.randbelow(9_000_000))
-        if not Account.objects.filter(pk=account_number).exists():
-            return account_number
 
 
 class SignupView(APIView):
@@ -57,53 +54,45 @@ class SignupView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        raw_user_name = request.data.get("user_name", "")
-        raw_email = request.data.get("email", "")
-        password = request.data.get("password", "")
-        user_name = raw_user_name.strip() if isinstance(raw_user_name, str) else ""
-        email = raw_email.strip().lower() if isinstance(raw_email, str) else ""
+        serializer = SignupSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        errors = {}
-        if not email:
-            errors["email"] = ["メールアドレスを入力してください。"]
-        elif len(email) > User._meta.get_field("username").max_length:
-            errors["email"] = ["メールアドレスが長すぎます。"]
-        else:
-            try:
-                validate_email(email)
-            except ValidationError:
-                errors["email"] = ["メールアドレスの形式が正しくありません。"]
-            if User.objects.filter(email__iexact=email).exists():
-                errors["email"] = ["このメールアドレスは既に使用されています。"]
-        if not user_name:
-            errors["user_name"] = ["表示名を入力してください。"]
-        elif len(user_name) > 100:
-            errors["user_name"] = ["表示名は100文字以内にしてください。"]
-        if not isinstance(password, str) or not password:
-            errors["password"] = ["パスワードを入力してください。"]
-        else:
-            try:
-                validate_password(password, user=User(username=email, email=email))
-            except ValidationError as exc:
-                errors["password"] = list(exc.messages)
-        if errors:
-            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+        validated_data = serializer.validated_data
 
         try:
             with transaction.atomic():
                 user = User.objects.create_user(
-                    username=email,
-                    password=password,
-                    email=email,
+                    username=validated_data["email"],
+                    email=validated_data["email"],
+                    password=validated_data["password"],
+                    is_active=True,
+                    is_staff=False,
+                    is_superuser=False,
                 )
                 account = Account.objects.create(
-                    account_number=generate_account_number(),
-                    user=user,
-                    user_name=user_name,
+                    account_number=validated_data["account_number"],
+                    user_name=validated_data["user_name"],
+                    user_icon="",
                     account_balance=0,
+                    auth_user=user,
                 )
                 token = Token.objects.create(user=user)
-        except Exception:
+        except IntegrityError:
+            duplicate_errors = {}
+            if Account.objects.filter(pk=validated_data["account_number"]).exists():
+                duplicate_errors["account_number"] = [
+                    "この口座番号は既に使用されています。"
+                ]
+            if User.objects.filter(email__iexact=validated_data["email"]).exists():
+                duplicate_errors["email"] = [
+                    "このメールアドレスは既に使用されています。"
+                ]
+            if duplicate_errors:
+                return Response(
+                    duplicate_errors,
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             return Response(
                 {"error": "アカウントを作成できませんでした。"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -113,7 +102,7 @@ class SignupView(APIView):
             {
                 "token": token.key,
                 "email": user.email,
-                "account": account_data(account),
+                "account": authenticated_account_data(account),
             },
             status=status.HTTP_201_CREATED,
         )
@@ -143,7 +132,7 @@ class LoginView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            account = user.account
+            account = user.bank_account
         except Account.DoesNotExist:
             return Response(
                 {"error": "メールアドレスまたはパスワードが正しくありません。"},
@@ -154,7 +143,7 @@ class LoginView(APIView):
             {
                 "token": token.key,
                 "email": user.email,
-                "account": account_data(account),
+                "account": authenticated_account_data(account),
             }
         )
 
@@ -177,9 +166,8 @@ class CurrentUserView(APIView):
                 {"error": "ログインユーザーに口座が紐づいていません。"},
                 status=status.HTTP_409_CONFLICT,
             )
-        return Response(
-            {"email": request.user.email, "account": account_data(account)}
-        )
+        data = authenticated_account_data(account)
+        return Response({**data, "account": account_data(account)})
 
 
 class MyAccountSummaryView(APIView):

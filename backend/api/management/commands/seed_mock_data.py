@@ -87,7 +87,7 @@ class Command(BaseCommand):
                         "account_balance": item["account_balance"],
                     }
                     if auth_user is not None:
-                        account_defaults["user"] = auth_user
+                        account_defaults["auth_user"] = auth_user
                     # 口座番号が既存なら更新、なければ新規作成する。
                     _, created = Account.objects.update_or_create(
                         account_number=item["account_number"],

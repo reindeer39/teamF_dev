@@ -12,21 +12,22 @@ Authorization: Token <loginまたはsignupで取得したtoken>
 
 ### 新規登録
 
-`POST /auth/signup`
+`POST /auth/signup/`
 
 ```json
 {
+  "account_number": "1234567",
+  "user_name": "表示名",
   "email": "new-user@example.com",
-  "password": "十分に強いパスワード",
-  "user_name": "表示名"
+  "password": "十分に強いパスワード"
 }
 ```
 
-Django Userと残高0円のAccountを同一トランザクション内で作成し、`201 Created`でトークン、メールアドレス、口座情報を返します。口座番号は重複しない7桁の番号を自動生成します。
+Django Userと残高0円のAccountを同一トランザクション内で作成し、`201 Created`でトークン、メールアドレス、口座情報を返します。口座番号は利用者が指定する7桁の数字で、既存Accountと重複できません。メールアドレスは小文字へ正規化し、大文字・小文字を無視して重複を拒否します。入力不正時は`account_number`、`user_name`、`email`、`password`ごとのエラー配列を返します。
 
 ### ログイン
 
-`POST /auth/login`
+`POST /auth/login/`
 
 ```json
 {
@@ -39,8 +40,8 @@ Django Userと残高0円のAccountを同一トランザクション内で作成�
 
 ### ログイン状態・ログアウト
 
-- `GET /auth/me`: 保存済みトークンに紐づくUserとAccountを返す
-- `POST /auth/logout`: 現在のトークンを削除し`204 No Content`を返す
+- `GET /auth/me/`: 保存済みトークンに紐づくUserとAccountだけを返す
+- `POST /auth/logout/`: 現在のトークンを削除し`204 No Content`を返す
 
 ## 認証済み口座・送金API
 

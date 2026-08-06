@@ -317,14 +317,14 @@ python manage.py seed_mock_data --reset
 
 | Reactの操作 | API | データベース処理 |
 |---|---|---|
-| 新規登録 | `POST /api/auth/signup` | Django UserとAccountを同時作成 |
-| ログイン | `POST /api/auth/login` | 認証トークンと口座情報を取得 |
-| ログイン状態を復元 | `GET /api/auth/me` | トークンに紐づくUserとAccountを取得 |
+| 新規登録 | `POST /api/auth/signup/` | 7桁の口座番号・表示名・メール・パスワードからDjango UserとAccountを同時作成 |
+| ログイン | `POST /api/auth/login/` | 認証トークンと口座情報を取得 |
+| ログイン状態を復元 | `GET /api/auth/me/` | トークンに紐づく自分のUserとAccountを取得 |
 | トップ画面を表示 | `GET /api/account/summary` | ログイン中の`accounts`を取得 |
 | 「送金する」を押す | `GET /api/account/recipients` | ログイン口座以外のAccountを取得 |
 | 送金先を選択 | `GET /api/account/recipients/{recipient}` | 送金先と送金可能残高を取得 |
 | 金額・メッセージを入力して「送金」を押す | `POST /api/transfers/{recipient}` | 認証ユーザーを送金元として残高更新とTransaction作成 |
-| ログアウト | `POST /api/auth/logout` | サーバーとブラウザのトークンを削除 |
+| ログアウト | `POST /api/auth/logout/` | サーバーとブラウザのトークンを削除 |
 
 固定の`src/account.js`は廃止しました。送金元口座はURLやReactの定数ではなく、AuthorizationヘッダーのトークンからDjangoが確定します。
 
@@ -366,6 +366,7 @@ index.js
 - `src/SelectSendMoney/SelectSendMoney.js`: 送金先一覧の取得
 - `src/ProcessSendMoney/ProcessSendMoney.js`: 送金先情報の取得と送金POST
 - `backend/api/urls.py`: APIのURL定義
+- `backend/api/serializers.py`: 新規登録の4項目と重複・パスワード検証
 - `backend/api/views.py`: Accountの取得、残高更新、Transaction登録
 - `backend/api/tests.py`: APIリクエストからDB更新までの自動テスト
 

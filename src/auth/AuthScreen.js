@@ -6,21 +6,37 @@ function AuthScreen({ onLogin, onSignup }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userName, setUserName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
 
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitting(true);
     setError('');
+    setFieldErrors({});
     try {
       if (mode === 'login') {
         await onLogin({ email, password });
       } else {
-        await onSignup({ email, password, user_name: userName });
+        await onSignup({
+          account_number: accountNumber,
+          user_name: userName,
+          email,
+          password,
+        });
       }
     } catch (apiError) {
-      setError(apiError.message);
+      const responseErrors = apiError.data || {};
+      const nextFieldErrors = responseErrors.errors || responseErrors;
+      const knownFields = ['account_number', 'user_name', 'email', 'password'];
+      const hasFieldErrors = knownFields.some((field) => nextFieldErrors[field]);
+      if (hasFieldErrors) {
+        setFieldErrors(nextFieldErrors);
+      } else {
+        setError(apiError.message);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -29,6 +45,7 @@ function AuthScreen({ onLogin, onSignup }) {
   function switchMode(nextMode) {
     setMode(nextMode);
     setError('');
+    setFieldErrors({});
   }
 
   return (
@@ -62,6 +79,25 @@ function AuthScreen({ onLogin, onSignup }) {
         <form className="auth-form" onSubmit={handleSubmit}>
           {mode === 'signup' && (
             <>
+              <label htmlFor="auth-account-number">口座番号</label>
+              <input
+                id="auth-account-number"
+                value={accountNumber}
+                onChange={(event) => setAccountNumber(event.target.value)}
+                inputMode="numeric"
+                pattern="[0-9]{7}"
+                maxLength="7"
+                autoComplete="off"
+                aria-describedby={fieldErrors.account_number ? 'auth-account-number-error' : undefined}
+                aria-invalid={Boolean(fieldErrors.account_number)}
+                required
+              />
+              {fieldErrors.account_number && (
+                <p id="auth-account-number-error" className="auth-form__field-error" role="alert">
+                  {fieldErrors.account_number.join(' ')}
+                </p>
+              )}
+
               <label htmlFor="auth-user-name">表示名</label>
               <input
                 id="auth-user-name"
@@ -69,8 +105,15 @@ function AuthScreen({ onLogin, onSignup }) {
                 onChange={(event) => setUserName(event.target.value)}
                 autoComplete="name"
                 maxLength="100"
+                aria-describedby={fieldErrors.user_name ? 'auth-user-name-error' : undefined}
+                aria-invalid={Boolean(fieldErrors.user_name)}
                 required
               />
+              {fieldErrors.user_name && (
+                <p id="auth-user-name-error" className="auth-form__field-error" role="alert">
+                  {fieldErrors.user_name.join(' ')}
+                </p>
+              )}
             </>
           )}
 
@@ -81,8 +124,15 @@ function AuthScreen({ onLogin, onSignup }) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
+            aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
+            aria-invalid={Boolean(fieldErrors.email)}
             required
           />
+          {fieldErrors.email && (
+            <p id="auth-email-error" className="auth-form__field-error" role="alert">
+              {fieldErrors.email.join(' ')}
+            </p>
+          )}
 
           <label htmlFor="auth-password">パスワード</label>
           <input
@@ -91,8 +141,15 @@ function AuthScreen({ onLogin, onSignup }) {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            aria-describedby={fieldErrors.password ? 'auth-password-error' : undefined}
+            aria-invalid={Boolean(fieldErrors.password)}
             required
           />
+          {fieldErrors.password && (
+            <p id="auth-password-error" className="auth-form__field-error" role="alert">
+              {fieldErrors.password.join(' ')}
+            </p>
+          )}
 
           {error && <p className="auth-form__error" role="alert">{error}</p>}
           <button type="submit" className="auth-submit" disabled={submitting}>

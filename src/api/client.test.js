@@ -40,3 +40,20 @@ test('ログアウト時に利用するトークン削除処理', () => {
 
   expect(getStoredToken()).toBeNull();
 });
+
+test('フィールド別APIエラーをメッセージとdataへ保持する', async () => {
+  global.fetch.mockResolvedValue({
+    ok: false,
+    status: 400,
+    json: async () => ({
+      account_number: ['この口座番号は既に使用されています。'],
+    }),
+  });
+
+  await expect(request('/auth/signup/')).rejects.toMatchObject({
+    message: 'この口座番号は既に使用されています。',
+    data: {
+      account_number: ['この口座番号は既に使用されています。'],
+    },
+  });
+});

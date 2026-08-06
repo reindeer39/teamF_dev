@@ -20,6 +20,8 @@ function errorMessage(data, status) {
   if (data.errors) {
     return Object.values(data.errors).flat().join(' ');
   }
+  const fieldMessages = Object.values(data).filter((value) => Array.isArray(value));
+  if (fieldMessages.length > 0) return fieldMessages.flat().join(' ');
   return `API request failed (${status})`;
 }
 

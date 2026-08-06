@@ -12,7 +12,7 @@ DB: SQLite (`backend/db.sqlite3`)
 | カラム名 | 型 | 制約 | 意味 |
 |---|---|---|---|
 | `account_number` | CharField(max_length=20) | PK | 口座番号 |
-| `user_id` | OneToOneField → Django User | null可, unique, on_delete=SET_NULL | ログインユーザー |
+| `auth_user_id` | OneToOneField → Django User | null可, unique, on_delete=CASCADE | 認証ユーザー |
 | `user_icon` | CharField(max_length=255) | blank可, default="" | ユーザーアイコンのパス |
 | `user_name` | CharField(max_length=100) | 必須 | ユーザー名 |
 | `account_balance` | PositiveBigIntegerField | default=0 | 預金残高 |
@@ -25,7 +25,7 @@ DB: SQLite (`backend/db.sqlite3`)
 
 `Transaction`から参照されている`Account`は`on_delete=PROTECT`により削除できない（送金履歴の整合性を守るため）。
 
-認証Userを削除しても金融データを消さないため、Accountとの関連だけを`SET_NULL`にする。新規登録APIで作成するAccountには必ずUserを設定し、既存モック・移行データとの互換性のためDB上はnullを許可する。
+新規登録APIで作成するAccountには必ず認証Userを設定する。認証Userを削除した場合、そのUserに属するAccountも`CASCADE`で削除する。既存モック・移行データとの互換性のため、`auth_user`自体はnullを許可する。
 
 ---
 
@@ -58,7 +58,7 @@ DB: SQLite (`backend/db.sqlite3`)
 ```
 Account (accounts)
   account_number (PK)
-  user_id → auth_user (SET_NULL, OneToOne)
+  auth_user_id → auth_user (CASCADE, OneToOne, related_name=bank_account)
      ├─< sent_transactions ─── Transaction.sender
      └─< received_transactions ─ Transaction.recipient
 
@@ -80,5 +80,5 @@ Transaction (transactions)
 
 `/admin/` から `Account` / `Transaction` / `Invoice` の一覧・検索・編集が可能（`backend/api/admin.py`）。
 
-- `AccountAdmin`: 口座番号・ユーザー名・残高で一覧表示、口座番号/ユーザー名で検索
+- `AccountAdmin`: 口座番号・ユーザー名・残高・認証User・メールアドレスを一覧表示し、口座番号/ユーザー名/認証情報で検索
 - `TransactionAdmin`: 取引番号・送信元・送信先・金額・メッセージ・日時で一覧表示、日時でフィルタ、口座番号/ユーザー名/メッセージで検索。`transaction_number`と`created_at`は編集不可

@@ -26,10 +26,15 @@ from api.views import (
 )
 
 urlpatterns = [
-    path("auth/signup", SignupView.as_view(), name="signup"),
-    path("auth/login", LoginView.as_view(), name="login"),
-    path("auth/logout", LogoutView.as_view(), name="logout"),
-    path("auth/me", CurrentUserView.as_view(), name="current-user"),
+    path("auth/signup/", SignupView.as_view(), name="signup"),
+    path("auth/login/", LoginView.as_view(), name="login"),
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
+    path("auth/me/", CurrentUserView.as_view(), name="current-user"),
+    # 既存React・外部クライアント向けの末尾スラッシュなしURLも維持する。
+    path("auth/signup", SignupView.as_view(), name="signup-legacy"),
+    path("auth/login", LoginView.as_view(), name="login-legacy"),
+    path("auth/logout", LogoutView.as_view(), name="logout-legacy"),
+    path("auth/me", CurrentUserView.as_view(), name="current-user-legacy"),
     path("account/summary", MyAccountSummaryView.as_view(), name="my-summary"),
     path(
         "account/recipients",

@@ -17,12 +17,13 @@ class Account(models.Model):
 
     # 口座番号を主キーにするため、同じ番号のAccountは重複登録できない。
     account_number = models.CharField(max_length=20, primary_key=True)
-    user = models.OneToOneField(
+    auth_user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        related_name="account",
+        on_delete=models.CASCADE,
+        related_name="bank_account",
         null=True,
         blank=True,
+        verbose_name="認証ユーザー",
     )
     user_icon = models.CharField(max_length=255, blank=True, default="")
     user_name = models.CharField(max_length=100)

@@ -741,7 +741,7 @@ class AuthenticationAPITests(APITestCase):
         )
         self.account = Account.objects.create(
             account_number="4100001",
-            user=self.user,
+            auth_user=self.user,
             user_name="ログイン利用者",
             account_balance=10000,
         )
@@ -756,44 +756,153 @@ class AuthenticationAPITests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
         return token
 
+    def signup_data(self, **overrides):
+        data = {
+            "account_number": "4200001",
+            "user_name": "新規利用者",
+            "email": "new-user@example.com",
+            "password": "Correct-Horse-57!",
+        }
+        data.update(overrides)
+        return data
+
     def test_signup_creates_user_account_and_token(self):
         response = self.client.post(
-            "/api/auth/signup",
-            {
-                "email": "new-user@example.com",
-                "password": "Correct-Horse-57!",
-                "user_name": "新規利用者",
-            },
+            "/api/auth/signup/",
+            self.signup_data(),
             format="json",
         )
 
         self.assertEqual(response.status_code, 201)
         created_user = User.objects.get(email="new-user@example.com")
         self.assertTrue(created_user.check_password("Correct-Horse-57!"))
-        self.assertEqual(created_user.account.user_name, "新規利用者")
-        self.assertEqual(created_user.account.account_balance, 0)
-        self.assertEqual(len(created_user.account.account_number), 7)
+        self.assertEqual(created_user.bank_account.user_name, "新規利用者")
+        self.assertEqual(created_user.bank_account.account_balance, 0)
+        self.assertEqual(created_user.bank_account.account_number, "4200001")
         self.assertEqual(response.data["token"], created_user.auth_token.key)
         self.assertEqual(response.data["email"], "new-user@example.com")
+        self.assertNotIn("password", response.data)
+        self.assertNotIn("password", response.data["account"])
+
+    def test_signup_creates_general_user_permissions(self):
+        self.client.post("/api/auth/signup/", self.signup_data(), format="json")
+
+        created_user = User.objects.get(email="new-user@example.com")
+        self.assertTrue(created_user.is_active)
+        self.assertFalse(created_user.is_staff)
+        self.assertFalse(created_user.is_superuser)
+
+    def test_signup_links_user_and_account_one_to_one(self):
+        self.client.post("/api/auth/signup/", self.signup_data(), format="json")
+
+        created_user = User.objects.get(email="new-user@example.com")
+        account = Account.objects.get(account_number="4200001")
+        self.assertEqual(account.auth_user, created_user)
+        self.assertEqual(created_user.bank_account, account)
+
+    def test_signup_saves_normalized_values_in_separate_models(self):
+        self.client.post(
+            "/api/auth/signup/",
+            self.signup_data(
+                account_number=" 0123456 ",
+                user_name=" 新規利用者 ",
+                email=" NEW-USER@Example.COM ",
+            ),
+            format="json",
+        )
+
+        created_user = User.objects.get(email="new-user@example.com")
+        account = Account.objects.get(pk="0123456")
+        self.assertEqual(created_user.username, "new-user@example.com")
+        self.assertEqual(account.account_number, "0123456")
+        self.assertEqual(account.user_name, "新規利用者")
+        self.assertEqual(account.user_icon, "")
+        self.assertEqual(account.account_balance, 0)
+
+    def test_signup_hashes_password_and_account_has_no_password_field(self):
+        plain_password = "Correct-Horse-57!"
+        self.client.post(
+            "/api/auth/signup/",
+            self.signup_data(password=plain_password),
+            format="json",
+        )
+
+        created_user = User.objects.get(email="new-user@example.com")
+        self.assertNotEqual(created_user.password, plain_password)
+        self.assertTrue(created_user.check_password(plain_password))
+        self.assertNotIn("password", [field.name for field in Account._meta.fields])
 
     def test_signup_rejects_duplicate_email_without_creating_account(self):
         response = self.client.post(
-            "/api/auth/signup",
-            {
-                "email": "LOGIN@example.com",
-                "password": "another-strong-pass",
-                "user_name": "重複利用者",
-            },
+            "/api/auth/signup/",
+            self.signup_data(email="LOGIN@example.com"),
             format="json",
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("email", response.data["errors"])
+        self.assertEqual(
+            response.data["email"],
+            ["このメールアドレスは既に使用されています。"],
+        )
         self.assertEqual(Account.objects.count(), 2)
+
+    def test_signup_rejects_duplicate_account_number(self):
+        response = self.client.post(
+            "/api/auth/signup/",
+            self.signup_data(account_number="4100001"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["account_number"],
+            ["この口座番号は既に使用されています。"],
+        )
+        self.assertFalse(User.objects.filter(email="new-user@example.com").exists())
+
+    def test_signup_rejects_invalid_account_number(self):
+        response = self.client.post(
+            "/api/auth/signup/",
+            self.signup_data(account_number="0012A45"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("account_number", response.data)
+
+    def test_signup_rejects_invalid_email(self):
+        response = self.client.post(
+            "/api/auth/signup/",
+            self.signup_data(email="not-an-email"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("email", response.data)
+
+    def test_signup_rejects_weak_password(self):
+        response = self.client.post(
+            "/api/auth/signup/",
+            self.signup_data(password="12345678"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password", response.data)
+        self.assertFalse(User.objects.filter(email="new-user@example.com").exists())
+
+    @patch("api.views.Account.objects.create", side_effect=IntegrityError("failure"))
+    def test_signup_rolls_back_user_if_account_creation_fails(self, _mock_create):
+        response = self.client.post(
+            "/api/auth/signup/", self.signup_data(), format="json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(email="new-user@example.com").exists())
 
     def test_login_returns_token_and_account(self):
         response = self.client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             {"email": "LOGIN@example.com", "password": "strong-test-pass"},
             format="json",
         )
@@ -805,12 +914,12 @@ class AuthenticationAPITests(APITestCase):
 
     def test_login_failure_does_not_reveal_invalid_field(self):
         wrong_password_response = self.client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             {"email": "login@example.com", "password": "wrong-password"},
             format="json",
         )
         unknown_email_response = self.client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             {"email": "unknown@example.com", "password": "strong-test-pass"},
             format="json",
         )
@@ -832,7 +941,7 @@ class AuthenticationAPITests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/auth/login",
+            "/api/auth/login/",
             {"email": "no-account@example.com", "password": "strong-test-pass"},
             format="json",
         )
@@ -844,23 +953,34 @@ class AuthenticationAPITests(APITestCase):
         )
 
     def test_current_user_requires_authentication(self):
-        response = self.client.get("/api/auth/me")
+        response = self.client.get("/api/auth/me/")
 
         self.assertEqual(response.status_code, 401)
 
     def test_current_user_returns_linked_account(self):
         self._authenticate()
 
-        response = self.client.get("/api/auth/me")
+        response = self.client.get("/api/auth/me/")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["email"], "login@example.com")
+        self.assertEqual(response.data["account_number"], "4100001")
         self.assertEqual(response.data["account"]["account_number"], "4100001")
+        self.assertNotIn("password", response.data)
+
+    def test_general_user_cannot_access_django_admin(self):
+        self.client.force_authenticate(user=None)
+        self.client.force_login(self.user)
+
+        response = self.client.get("/admin/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)
 
     def test_logout_invalidates_token(self):
         token = self._authenticate()
 
-        response = self.client.post("/api/auth/logout")
+        response = self.client.post("/api/auth/logout/")
 
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Token.objects.filter(key=token.key).exists())
@@ -890,7 +1010,7 @@ class TransferAPITests(APITestCase):
         )
         self.sender = Account.objects.create(
             account_number="4000001",
-            user=self.user,
+            auth_user=self.user,
             user_icon="/icons/sender.png",
             user_name="API送金者",
             account_balance=10000,
