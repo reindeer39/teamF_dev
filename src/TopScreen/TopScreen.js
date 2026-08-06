@@ -7,8 +7,8 @@ function TopScreen({
   loading,
   error,
   onSelectRecipient,
-  onBilling,
-  onBillingStatus,
+  onInvoice,
+  onInvoiceStatus,
 }) {
   const buttonWidth = '80vw';
   const buttonHeight = '7vh';
@@ -62,7 +62,7 @@ function TopScreen({
           backgroundColor={buttonColor}
           hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
-          onClick={onBilling}
+          onClick={onInvoice}
         >
           請求する
         </NavigationButton>
@@ -73,7 +73,7 @@ function TopScreen({
           backgroundColor={buttonColor}
           hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
-          onClick={onBillingStatus}
+          onClick={onInvoiceStatus}
         >
           請求状態確認
         </NavigationButton>

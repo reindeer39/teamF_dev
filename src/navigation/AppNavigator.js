@@ -3,7 +3,7 @@ import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
 import NextScreen from '../NextScreen/NextScreen';
-import BillingStatusScreen from '../BillingStatus/BillingStatusScreen';
+import InvoiceStatusScreen from '../InvoiceStatus/InvoiceStatusScreen';
 import { ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 
@@ -66,13 +66,13 @@ function AppNavigator() {
     );
   }
 
-  if (currentScreen === 'billing') {
+  if (currentScreen === 'invoice') {
     return <NextScreen onBack={() => setCurrentScreen('profile')} />;
   }
 
-  if (currentScreen === 'billingStatus') {
+  if (currentScreen === 'invoiceStatus') {
     return (
-      <BillingStatusScreen
+      <InvoiceStatusScreen
         onBack={() => setCurrentScreen('profile')}
       />
     );
@@ -84,8 +84,8 @@ function AppNavigator() {
       loading={loading}
       error={error}
       onSelectRecipient={() => setCurrentScreen('recipients')}
-      onBilling={() => setCurrentScreen('billing')}
-      onBillingStatus={() => setCurrentScreen('billingStatus')}
+      onInvoice={() => setCurrentScreen('invoice')}
+      onInvoiceStatus={() => setCurrentScreen('invoiceStatus')}
     />
   );
 }

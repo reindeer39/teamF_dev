@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { getUserSummary } from '../api/users';
 import human1 from '../images/human1.png';
-import './BillingStatusScreen.css';
+import './InvoiceStatusScreen.css';
 
 const USER_ICONS = {
   'user1.png': human1,
 };
 
-const BILLING_REQUESTS = [
+const INVOICE_REQUESTS = [
   {
     invoiced_at: '2026-08-05 12:30:00.000000',
     payment_flag: 'pay',
@@ -45,14 +45,14 @@ function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
 }
 
-function BillingStatusScreen({ onBack }) {
+function InvoiceStatusScreen({ onBack }) {
   const [openInvoiceNumber, setOpenInvoiceNumber] = useState(null);
   const [payer, setPayer] = useState(null);
   const [payerLoading, setPayerLoading] = useState(false);
   const [payerError, setPayerError] = useState('');
 
   useEffect(() => {
-    const openInvoice = BILLING_REQUESTS.find(
+    const openInvoice = INVOICE_REQUESTS.find(
       (invoice) => invoice.invoice_number === openInvoiceNumber
     );
 
@@ -110,22 +110,22 @@ function BillingStatusScreen({ onBack }) {
   };
 
   return (
-    <main className="billing-status-screen">
-      <section className="billing-status-panel">
-        <header className="billing-status-header">
+    <main className="invoice-status-screen">
+      <section className="invoice-status-panel">
+        <header className="invoice-status-header">
           <button
-            className="billing-back-button"
+            className="invoice-back-button"
             type="button"
             aria-label="前の画面に戻る"
             onClick={onBack}
           >
             &lt;
           </button>
-          <h1 className="billing-status-title">請求リスト</h1>
+          <h1 className="invoice-status-title">請求リスト</h1>
         </header>
 
-        <div className="billing-list">
-          {BILLING_REQUESTS.map((invoice) => {
+        <div className="invoice-list">
+          {INVOICE_REQUESTS.map((invoice) => {
             const invoiceNumber = invoice.invoice_number;
             const isOpen = openInvoiceNumber === invoiceNumber;
             const invoiceInfo = INVOICE_DETAILS[invoiceNumber];
@@ -134,22 +134,22 @@ function BillingStatusScreen({ onBack }) {
             const isPaid = invoice.payment_flag === 'pay';
 
             return (
-              <article className="billing-item" key={invoiceNumber}>
-                <div className="billing-item-summary">
+              <article className="invoice-item" key={invoiceNumber}>
+                <div className="invoice-item-summary">
                   <time dateTime={invoice.invoiced_at?.replace(' ', 'T')}>
                     {invoiceTime}
                   </time>
                   <span
-                    className={`billing-item-status ${
+                    className={`invoice-item-status ${
                       isPaid
-                        ? 'billing-item-status--paid'
-                        : 'billing-item-status--unpaid'
+                        ? 'invoice-item-status--paid'
+                        : 'invoice-item-status--unpaid'
                     }`}
                   >
                     {isPaid ? '支払済み' : '未払い'}
                   </span>
                   <button
-                    className="billing-toggle"
+                    className="invoice-toggle"
                     type="button"
                     aria-expanded={isOpen}
                     aria-controls={detailsId}
@@ -157,10 +157,10 @@ function BillingStatusScreen({ onBack }) {
                     onClick={() => toggleInvoice(invoice)}
                   >
                     <span
-                      className={`billing-toggle-icon ${
+                      className={`invoice-toggle-icon ${
                         isOpen
-                          ? 'billing-toggle-icon--up'
-                          : 'billing-toggle-icon--down'
+                          ? 'invoice-toggle-icon--up'
+                          : 'invoice-toggle-icon--down'
                       }`}
                       aria-hidden="true"
                     >
@@ -170,18 +170,18 @@ function BillingStatusScreen({ onBack }) {
                 </div>
 
                 {isOpen && (
-                  <div className="billing-item-details" id={detailsId}>
+                  <div className="invoice-item-details" id={detailsId}>
                     {invoiceInfo ? (
                       <>
                         {isPaid && payerLoading && <p>支払人情報を読み込み中...</p>}
                         {isPaid && payerError && (
-                          <p className="billing-list-message--error">{payerError}</p>
+                          <p className="invoice-list-message--error">{payerError}</p>
                         )}
                         {payer && (
-                          <div className="billing-user-row">
-                            <span className="billing-payer-label">支払人</span>
+                          <div className="invoice-user-row">
+                            <span className="invoice-payer-label">支払人</span>
                             <img
-                              className="billing-face"
+                              className="invoice-face"
                               src={resolveUserIcon(payer.user_icon)}
                               alt={`${payer.user_name}のアイコン`}
                             />
@@ -190,20 +190,20 @@ function BillingStatusScreen({ onBack }) {
                         )}
 
                         <div
-                          className={`billing-amount-row ${
+                          className={`invoice-amount-row ${
                             isPaid
-                              ? 'billing-amount-row--paid'
-                              : 'billing-amount-row--unpaid'
+                              ? 'invoice-amount-row--paid'
+                              : 'invoice-amount-row--unpaid'
                           }`}
                         >
-                          <p className="billing-amount">
+                          <p className="invoice-amount">
                             請求金額：
                             {Number(invoiceInfo.invoice_amount).toLocaleString('ja-JP')}円
                           </p>
 
                           {!isPaid && (
                             <button
-                              className="billing-copy-link-button"
+                              className="invoice-copy-link-button"
                               type="button"
                               onClick={() => copyInvoiceLink(invoiceNumber)}
                             >
@@ -212,13 +212,13 @@ function BillingStatusScreen({ onBack }) {
                           )}
                         </div>
 
-                        <label className="billing-message-label">
+                        <label className="invoice-message-label">
                           メッセージ
                           <textarea value={invoiceInfo.message || ''} readOnly />
                         </label>
                       </>
                     ) : (
-                      <p className="billing-list-message--error">
+                      <p className="invoice-list-message--error">
                         請求詳細の仮データが見つかりません。
                       </p>
                     )}
@@ -233,4 +233,4 @@ function BillingStatusScreen({ onBack }) {
   );
 }
 
-export default BillingStatusScreen;
+export default InvoiceStatusScreen;
