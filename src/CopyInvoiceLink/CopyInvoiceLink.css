@@ -1,70 +1,100 @@
 .copy-invoice-link {
-  position: relative;
+  display: flex;
   min-height: 100vh;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: clamp(40px, 9vh, 80px) 0 32px;
   background-color: var(--app-background-color);
-  color: #333333;
+  color: var(--app-text-color);
+}
+
+.copy-invoice-link__card {
+  display: flex;
+  width: var(--app-content-width);
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  padding: clamp(24px, 6vmin, 40px);
+  border: 1px solid #d6ddd8;
+  border-radius: var(--app-card-radius);
+  background-color: var(--app-surface-color);
+  box-shadow: 0 8px 24px rgb(34 64 44 / 8%);
   text-align: center;
 }
 
-.copy-invoice-link__display,
-.copy-invoice-link__copy-area,
-.copy-invoice-link__top-button {
-  position: absolute;
-  left: 50%;
-  width: var(--app-content-width);
-  transform: translate(-50%, -50%);
+.copy-invoice-link__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: var(--app-top-bar-color);
+  color: var(--app-primary-color);
+  font-size: 1.75rem;
+  font-weight: 700;
 }
 
-.copy-invoice-link__display {
-  top: 20vh;
+.copy-invoice-link__card h2 {
+  margin: 16px 0 8px;
+  font-size: clamp(1.2rem, 4.5vw, 1.5rem);
 }
 
-.copy-invoice-link__display p {
-  margin: 0 0 12px;
+.copy-invoice-link__guide {
+  margin: 0 0 20px;
+  color: #5f6862;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .copy-invoice-link__url {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 16px;
+  border: 1px solid #cbd5ce;
+  border-radius: var(--app-control-radius);
+  box-sizing: border-box;
+  background-color: #f7faf8;
+  color: #35443a;
+  font-size: 0.9rem;
+  line-height: 1.5;
   overflow-wrap: anywhere;
+  text-align: left;
 }
 
-.copy-invoice-link__copy-area {
-  top: 40vh;
-}
-
-.copy-invoice-link__copy-area button,
-.copy-invoice-link__top-button .navigation-button {
+.copy-invoice-link__card button {
+  width: 100%;
   height: 54px;
+  margin-top: 20px;
   border: 0;
   border-radius: var(--app-control-radius);
   background-color: var(--app-primary-color);
   color: #ffffff;
-  font-size: 16px;
+  font-size: 1rem;
   cursor: pointer;
 }
 
-.copy-invoice-link__copy-area button {
-  width: 100%;
+.copy-invoice-link__card button:hover {
+  background-color: var(--app-primary-hover-color);
 }
 
-.copy-invoice-link__copy-area button:disabled {
+.copy-invoice-link__card button:disabled {
   background-color: var(--app-disabled-color);
   cursor: not-allowed;
 }
 
-.copy-invoice-link__copy-area p {
+.copy-invoice-link__status {
   min-height: 24px;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
+  font-size: 0.9rem;
 }
 
-.copy-invoice-link__top-button {
-  top: 70vh;
+.copy-invoice-link__status--success {
+  color: var(--app-primary-color);
 }
 
-.copy-invoice-link__top-button .navigation-button {
-  width: 100%;
-  padding: 0;
-}
-
-.copy-invoice-link__top-button .navigation-button:hover {
-  transform: none;
+.copy-invoice-link__status--error {
+  color: #b42318;
 }

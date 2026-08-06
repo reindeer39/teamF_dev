@@ -1,36 +1,30 @@
 .make-invoice-link {
-  position: relative;
+  display: flex;
   min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 5vh, 40px);
+  padding:
+    clamp(24px, 5vh, 48px)
+    0
+    calc(clamp(24px, 5vh, 48px) + 8vh);
   box-sizing: border-box;
   background-color: var(--app-background-color);
-}
-
-.make-invoice-link__back {
-  position: absolute;
-  top: 20px;
-  left: 20px;
 }
 
 .make-invoice-link__amount,
 .make-invoice-link__message,
 .make-invoice-link__submit {
-  position: absolute;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.make-invoice-link__amount {
-  top: min(30vh, 253px);
+  flex: 0 0 auto;
 }
 
 .make-invoice-link__message {
-  top: min(70vh, 591px);
   width: min(70vw, 420px);
 }
 
 .make-invoice-link__submit {
-  top: min(90vh, 760px);
-  width: var(--app-content-width);
+  width: min(80vw, 560px);
 }
 
 .make-invoice-link__submit .navigation-button {
