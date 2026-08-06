@@ -81,7 +81,7 @@ function AppNavigator() {
     );
   }
 
-  if (currentScreen === 'billing') {
+  if (currentScreen === 'invoice') {
     return (
       <MakeInvoiceLink
         onBack={() => setCurrentScreen('profile')}
