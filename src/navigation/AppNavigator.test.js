@@ -55,6 +55,19 @@ test('DBから取得した口座情報と操作ボタンを表示する', async 
   expect(getUserSummary).toHaveBeenCalledWith('1000001');
 });
 
+test('請求するボタンから請求リンク作成画面へ遷移し、戻ることができる', async () => {
+  render(<AppNavigator />);
+
+  fireEvent.click(await screen.findByRole('button', { name: '請求する' }));
+
+  expect(screen.getByLabelText('請求金額')).toBeInTheDocument();
+  expect(screen.getByLabelText('メッセージ（任意）')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'リンク作成' })).toBeDisabled();
+
+  fireEvent.click(screen.getByRole('button', { name: '戻る' }));
+  expect(await screen.findByRole('button', { name: '請求する' })).toBeInTheDocument();
+});
+
 test('送金ボタンからAPIを呼び出して送金完了まで遷移する', async () => {
   render(<AppNavigator />);
 

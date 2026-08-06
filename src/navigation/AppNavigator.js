@@ -3,8 +3,8 @@ import { useRoutes } from 'react-router';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
-import ProcessPayment from '../ProcessPayment/ProcessPayment';
-import NextScreen from '../NextScreen/NextScreen';
+import MakeInvoiceLink from '../MakeInvoiceLink/MakeInvoiceLink';
+import CopyInvoiceLink from '../CopyInvoiceLink/CopyInvoiceLink';
 import { ACCOUNT_NUMBER } from '../account';
 import { getUserSummary } from '../api/users';
 
@@ -79,7 +79,26 @@ function AppNavigator() {
   }
 
   if (currentScreen === 'billing') {
-    return <NextScreen onBack={() => setCurrentScreen('profile')} />;
+    return (
+      <MakeInvoiceLink
+        onBack={() => setCurrentScreen('profile')}
+        onCreate={({ amount, message }) => {
+          const query = new URLSearchParams({ amount: String(amount) });
+          if (message) query.set('message', message);
+          setInvoiceLink(`${window.location.origin}/invoice?${query.toString()}`);
+          setCurrentScreen('copyInvoiceLink');
+        }}
+      />
+    );
+  }
+
+  if (currentScreen === 'copyInvoiceLink') {
+    return (
+      <CopyInvoiceLink
+        invoiceLink={invoiceLink}
+        onBack={() => setCurrentScreen('profile')}
+      />
+    );
   }
 
   return (
