@@ -34,5 +34,27 @@
       "transfer_amount": 1000,
       "message": "立替分"
     }
+  ],
+  "invoices": [
+    {
+      "invoice_number": "33333333-3333-4333-8333-333333333333",
+      "invoice_amount": 2500,
+      "message": "夕食代",
+      "account_number": "1000002",
+      "invoice_flag": "notpay",
+      "paid_time": null,
+      "paid_by": null,
+      "transaction_number": null
+    },
+    {
+      "invoice_number": "44444444-4444-4444-8444-444444444444",
+      "invoice_amount": 3000,
+      "message": "昼食代",
+      "account_number": "1000001",
+      "invoice_flag": "paid",
+      "paid_time": "2026-08-05T15:00:00+09:00",
+      "paid_by": "1000002",
+      "transaction_number": "11111111-1111-4111-8111-111111111111"
+    }
   ]
 }

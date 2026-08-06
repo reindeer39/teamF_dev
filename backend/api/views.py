@@ -4,13 +4,15 @@
 `Account.objects...`などがDjango ORMによるDB操作、`Response(...)`が
 Reactへ返すJSONレスポンスです。詳しい流れはBACKEND_FLOW_GUIDE.mdを参照。
 """
-import uuid
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from api.models import Account, Transaction
+from api.models import Account, Invoice, Transaction
 
 
 class UserSummaryView(APIView):
@@ -158,53 +160,54 @@ class TransferView(APIView):
             return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
-# 請求関連モデルの安全な参照
-try:
-    from api.models import Invoice
-except ImportError:
-    Invoice = None
-
-
 class InvoiceRequestView(APIView):
     """
     Step 7: 請求のリクエスト
     POST /api/user/{account_number}/invoice_request
     """
     def post(self, request, account_number: str):
-        # ReactがPOSTしたJSONを取得
         invoice_amount = request.data.get("invoice_amount")
         message = request.data.get("message", "")
 
-        # 入力検証: パラメータが不足している場合
         if invoice_amount is None:
-            return Response({"error": "Not enough parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Not enough parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if type(invoice_amount) is not int or invoice_amount < 1:
+            return Response(
+                {"error": "invoice_amount must be an integer greater than or equal to 1"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if message is None:
+            message = ""
+        if not isinstance(message, str) or len(message) > 200:
+            return Response(
+                {"error": "message must be a string of 200 characters or fewer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            # DB操作: 請求元口座が存在するか確認
             account = Account.objects.get(account_number=account_number)
-            invoice_number = str(uuid.uuid4())
+            invoice = Invoice(
+                invoice_amount=invoice_amount,
+                message=message,
+                account_number=account,
+            )
+            invoice.full_clean()
+            invoice.save()
 
-            # Invoice DBへ登録
-            if Invoice is not None:
-                from datetime import datetime
-                created_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-                Invoice.objects.create(
-                    invoice_number=invoice_number,
-                    invoice_amount=int(invoice_amount),
-                    message=message,
-                    account_number=account,
-                    created_time=created_time_str,
-                    invoice_flag="notpay",
-                )
-
-            # 生成された請求URLをJSONでReactへ返す
-            invoice_link = f"http://localhost:3000/invoice/{invoice_number}"
+            invoice_link = (
+                f"{settings.FRONTEND_BASE_URL.rstrip('/')}"
+                f"/invoice/{invoice.invoice_number}"
+            )
             return Response({"invoice_link": invoice_link}, status=status.HTTP_200_OK)
-
         except Account.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({"error": "Server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except ValidationError as exc:
+            return Response(
+                {"error": exc.message_dict}, status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class InvoiceInfoView(APIView):
@@ -213,20 +216,22 @@ class InvoiceInfoView(APIView):
     GET /api/{invoice_number}/get_inf
     """
     def get(self, request, invoice_number: str):
-        if Invoice is None:
-            return Response({"error": "Invoice model not defined yet"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
         try:
-            # DB操作: invoice_numberで請求レコードを1件検索
             invoice = Invoice.objects.get(invoice_number=invoice_number)
-            data = {
-                "invoice_account_number": getattr(invoice, "account_number_id", str(getattr(invoice, "account_number", ""))),
+        except (Invoice.DoesNotExist, ValidationError, ValueError):
+            return Response(
+                {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(
+            {
+                "invoice_account_number": invoice.account_number_id,
                 "invoice_amount": str(invoice.invoice_amount),
-                "invoice_message": getattr(invoice, "message", "") or "",
-            }
-            return Response(data, status=status.HTTP_200_OK)
-        except Exception:
-            return Response({"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND)
+                "invoice_message": invoice.message,
+                "invoice_flag": invoice.invoice_flag,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class InvoicePayView(APIView):
@@ -240,60 +245,111 @@ class InvoicePayView(APIView):
         invoice_amount = request.data.get("invoice_amount")
         message = request.data.get("message", "")
 
-        # 入力検証: 必須パラメータチェック
         if not my_account_number or not invoice_account_number or invoice_amount is None:
-            return Response({"error": "Not enough parameters"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Not enough parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if message is None:
+            message = ""
+        if not isinstance(message, str) or len(message) > 200:
+            return Response(
+                {"error": "message must be a string of 200 characters or fewer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if type(invoice_amount) is int:
+            requested_amount = invoice_amount
+        elif isinstance(invoice_amount, str) and invoice_amount.isdigit():
+            requested_amount = int(invoice_amount)
+        else:
+            return Response(
+                {"error": "invoice_amount must be an integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if requested_amount < 1:
+            return Response(
+                {"error": "invoice_amount must be greater than or equal to 1"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             with transaction.atomic():
-                # DB操作: 支払元・請求元口座の検索と残高ロック
-                payer = Account.objects.select_for_update().get(account_number=my_account_number)
-                payee = Account.objects.select_for_update().get(account_number=invoice_account_number)
+                invoice = (
+                    Invoice.objects.select_for_update()
+                    .select_related("account_number")
+                    .get(invoice_number=invoice_number)
+                )
+                if invoice.invoice_flag == Invoice.InvoiceFlag.PAID:
+                    return Response(
+                        {"error": "Invoice already paid"},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                if invoice.account_number_id != str(invoice_account_number):
+                    return Response(
+                        {"error": "Invoice account does not match"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if invoice.invoice_amount != requested_amount:
+                    return Response(
+                        {"error": "Invoice amount does not match"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if str(my_account_number) == invoice.account_number_id:
+                    return Response(
+                        {"error": "Payer and invoice account must be different"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
-                int_amount = int(invoice_amount)
+                payer = Account.objects.select_for_update().get(
+                    account_number=my_account_number
+                )
+                payee = Account.objects.select_for_update().get(
+                    account_number=invoice.account_number_id
+                )
+                if payer.account_balance < invoice.invoice_amount:
+                    return Response(
+                        {"error": "Insufficient account balance"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
-                # 残高不足チェック
-                if payer.account_balance < int_amount:
-                    return Response({"error": "Insufficient account balance"}, status=status.HTTP_400_BAD_REQUEST)
-
-                # 1. 残高移動処理
-                payer.account_balance -= int_amount
-                payee.account_balance += int_amount
+                payer.account_balance -= invoice.invoice_amount
+                payee.account_balance += invoice.invoice_amount
                 payer.save(update_fields=["account_balance"])
                 payee.save(update_fields=["account_balance"])
 
-                # 2. 送金履歴 (transactions) の登録 (共通の取引番号を使用)
                 transfer = Transaction.objects.create(
                     sender=payer,
                     recipient=payee,
-                    transfer_amount=int_amount,
+                    transfer_amount=invoice.invoice_amount,
                     message=message,
                 )
 
-                # 3. 請求DB (invoice) の更新 (送金DBの取引番号および支払日時を統一)
-                if Invoice is not None:
-                    try:
-                        invoice = Invoice.objects.select_for_update().get(invoice_number=invoice_number)
-                        
-                        # 送金DBの作成日時 (created_at) を paid_time フォーマット文字列へ統一
-                        paid_time_str = transfer.created_at.strftime("%Y-%m-%d %H:%M:%S.%f")
-                        
-                        invoice.invoice_flag = "paid"
-                        invoice.paid_time = paid_time_str
-                        invoice.paid_by = payer
-                        # 送金DBの取引番号 (transaction_number) と請求DBの取引番号を統一
-                        invoice.transaction_number = transfer
-                        invoice.save()
-                    except Exception:
-                        pass
+                invoice.invoice_flag = Invoice.InvoiceFlag.PAID
+                invoice.paid_time = transfer.created_at
+                invoice.paid_by = payer
+                invoice.transaction_number = transfer
+                invoice.full_clean()
+                invoice.save(
+                    update_fields=[
+                        "invoice_flag",
+                        "paid_time",
+                        "paid_by",
+                        "transaction_number",
+                    ]
+                )
 
-            # 処理完了 200 OK (空レスポンス)
             return Response(status=status.HTTP_200_OK)
-
+        except Invoice.DoesNotExist:
+            return Response(
+                {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
+            )
         except Account.DoesNotExist:
             return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception:
-            return Response({"error": "Server error"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except (ValidationError, ValueError):
+            return Response(
+                {"error": "Invalid invoice data"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class InvoiceListView(APIView):
@@ -302,36 +358,21 @@ class InvoiceListView(APIView):
     GET /api/user/{account_number}/invoice_list
     """
     def get(self, request, account_number: str):
-        # アカウントの存在確認
         if not Account.objects.filter(account_number=account_number).exists():
             return Response({"error": "not found account"}, status=status.HTTP_404_NOT_FOUND)
 
-        if Invoice is None:
-            return Response({"invoice_list": []}, status=status.HTTP_200_OK)
-
-        try:
-            # DB操作: 指定された請求元の請求を作成日時降順 (新しい順) で取得
-            invoices = Invoice.objects.filter(account_number=account_number).order_by("-created_time")
-
-            invoice_list = []
-            for inv in invoices:
-                # 日時文字列を YYYY-MM-DD HH:MM (分まで) に加工
-                created_time_raw = getattr(inv, "created_time", "") or ""
-                invoice_time = created_time_raw[:16] if len(created_time_raw) >= 16 else created_time_raw
-
-                # 支払った人の口座番号 (支払い前は null)
-                paid_by_val = getattr(inv, "paid_by_id", None)
-                if not paid_by_val and getattr(inv, "paid_by", None):
-                    paid_by_val = str(getattr(inv.paid_by, "account_number", ""))
-
-                invoice_list.append({
-                    "invoice_time": invoice_time,
-                    "invoice_flag": getattr(inv, "invoice_flag", "notpay"),
-                    "paid_by": paid_by_val if paid_by_val else None,
-                    "invoice_number": inv.invoice_number,
-                })
-
-            return Response({"invoice_list": invoice_list}, status=status.HTTP_200_OK)
-
-        except Exception:
-            return Response({"error": "not found account"}, status=status.HTTP_404_NOT_FOUND)
+        invoices = Invoice.objects.filter(account_number=account_number).order_by(
+            "-created_time"
+        )
+        invoice_list = [
+            {
+                "invoice_time": timezone.localtime(invoice.created_time).strftime(
+                    "%Y-%m-%d %H:%M:%S.%f"
+                ),
+                "invoice_flag": invoice.invoice_flag,
+                "paid_by": invoice.paid_by_id,
+                "invoice_number": str(invoice.invoice_number),
+            }
+            for invoice in invoices
+        ]
+        return Response({"invoice_list": invoice_list}, status=status.HTTP_200_OK)

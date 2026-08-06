@@ -83,14 +83,15 @@ python manage.py runserver
 - SQLiteデータベース: `backend/db.sqlite3`
 - 口座モデル・テーブル: `Account` / `accounts`
 - 送金履歴モデル・テーブル: `Transaction` / `transactions`
+- 請求モデル・テーブル: `Invoice` / `invoices`
 - モデルのマイグレーション: `backend/api/migrations/0001_initial.py`
 - 共有用モックデータ: `backend/api/mock_data/mock_data.json`
 - モックデータ投入コマンド: `python manage.py seed_mock_data`
 - JSON対象データの安全な再作成: `python manage.py seed_mock_data --reset`
-- AccountとTransactionのDjango管理画面
+- Account、Transaction、InvoiceのDjango管理画面
 - モデル、制約、モックデータ投入処理のテスト
 
-`Account`には口座番号、ユーザーアイコン、ユーザー名、預金残高を保存します。`Transaction`には取引番号、送金元口座、送金先口座、送金金額、メッセージ、送金日時を保存します。
+`Account`には口座番号、ユーザーアイコン、ユーザー名、預金残高を保存します。`Transaction`には取引番号、送金元口座、送金先口座、送金金額、メッセージ、送金日時を保存します。`Invoice`には請求リンクで使うUUID形式の請求番号、請求元・支払口座、請求金額、メッセージ、支払状態・日時、対応するTransactionを保存します。
 
 データベース制約により、残高は0以上、送金金額は1以上、送金元と送金先は別口座である必要があります。また、取引から参照されている口座は誤って削除されないように保護されています。
 
@@ -156,7 +157,7 @@ python manage.py seed_mock_data
 backend/api/mock_data/mock_data.json
 ```
 
-JSONはDjango fixture固有の形式ではなく、`accounts`と`transactions`を持つ通常のJSONです。主な記載ルールは次のとおりです。
+JSONはDjango fixture固有の形式ではなく、`accounts`、`transactions`、`invoices`を持つ通常のJSONです。主な記載ルールは次のとおりです。
 
 - `account_number`は文字列として記載する
 - `transaction_number`はUUID形式の文字列として記載する
@@ -165,6 +166,10 @@ JSONはDjango fixture固有の形式ではなく、`accounts`と`transactions`�
 - `sender_account_number`と`recipient_account_number`には存在する口座番号を記載する
 - 送金元と送金先に同じ口座を指定しない
 - 同じ口座番号または取引番号をJSON内で重複させない
+- `invoice_number`はUUID形式の文字列、`invoice_amount`は1以上の整数にする
+- `invoice_flag`は未払いの`notpay`または支払済みの`paid`にする
+- 未払いでは`paid_time`、`paid_by`、`transaction_number`をすべて`null`にする
+- 支払済みでは上記3項目をすべて設定し、請求元と支払口座を別口座にする
 - JSONにはコメントを書かない。補足説明はREADMEへ記載する
 
 編集した担当者は、コミット前に以下を実行して内容を確認してください。
@@ -202,12 +207,13 @@ python manage.py seed_mock_data
 python manage.py seed_mock_data
 ```
 
-Accountを先に登録し、その後Transactionを登録します。口座番号と取引番号を識別キーとしているため、実行結果は次のようになります。
+Account、Transaction、Invoiceの順に登録します。口座番号、取引番号、請求番号を識別キーとしているため、実行結果は次のようになります。
 
 - 初回実行: JSONのデータを新規登録
 - 2回目以降: 同じキーのデータを更新し、レコードは重複しない
 - JSONを変更して再実行: 既存データを新しい内容へ更新
 - 既存Transactionの更新: `created_at`は変更せず、送金元、送金先、金額、メッセージだけを更新
+- 既存Invoiceの更新: `created_time`は変更せず、請求内容と支払状態だけを更新
 
 処理全体はデータベーストランザクションで保護されています。不正なUUID、不足口座、負の残高、0円以下の送金などが見つかった場合は処理を中断し、途中まで登録したデータもすべてロールバックします。
 
@@ -221,10 +227,12 @@ python manage.py seed_mock_data --reset
 
 削除・登録順序は以下です。
 
-1. JSONに取引番号が記載されているTransactionだけを削除
-2. JSONに口座番号が記載されているAccountだけを削除
-3. JSONのAccountを登録
-4. JSONのTransactionを登録
+1. JSONに請求番号が記載されているInvoiceだけを削除
+2. JSONに取引番号が記載されているTransactionだけを削除
+3. JSONに口座番号が記載されているAccountだけを削除
+4. JSONのAccountを登録
+5. JSONのTransactionを登録
+6. JSONのInvoiceを登録
 
 データベース全体のflushや全件削除は行いません。JSONに記載されていない手動追加データは残ります。また、JSON外のTransactionが対象Accountを参照している場合は、安全のため削除せず処理全体をロールバックします。
 
@@ -273,6 +281,23 @@ python manage.py runserver
 ```
 
 ブラウザで`http://127.0.0.1:8000/admin/`を開いてください。Accountでは口座番号、ユーザー名、残高を、Transactionでは取引番号、送金元、送金先、送金金額、メッセージ、送金日時を確認できます。
+
+### 請求用モックデータを各開発者のSQLiteへ反映する
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py migrate
+python manage.py seed_mock_data
+```
+
+JSONの内容どおりに対象モックデータを作り直す場合は、次を実行します。
+
+```bash
+python manage.py seed_mock_data --reset
+```
+
+モックデータの編集場所は`backend/api/mock_data/mock_data.json`です。`backend/db.sqlite3`は各開発者のローカルファイルであり、Gitでは共有・コミットしません。テーブル構造はマイグレーション、共同開発用データはこのJSONで共有します。
 
 ## React・API・データベース連携
 

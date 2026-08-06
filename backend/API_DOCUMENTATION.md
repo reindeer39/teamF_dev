@@ -65,6 +65,8 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
   ```json
   {
     "sender_account_number": "123456",
+    "sender_account_balance": 100000,
+    "recipient_account_number": "654321",
     "recipient_icon": "/static/images/user2.png",
     "recipient_name": "佐藤花子"
   }
@@ -134,7 +136,8 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
   {
     "invoice_account_number": "123456",
     "invoice_amount": "10000",
-    "invoice_message": "飲み会代割り勘"
+    "invoice_message": "飲み会代割り勘",
+    "invoice_flag": "notpay"
   }
   ```
 
@@ -159,16 +162,18 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
     "error": "Not enough parameters"
   }
   ```
-* **Response 500 Server Error**:
+* **Response 409 Conflict**（支払済み請求）:
   ```json
   {
-    "error": "Server error"
+    "error": "Invoice already paid"
   }
   ```
+* URLの`invoice_number`から取得したInvoiceを正として扱い、リクエストの`invoice_account_number`と`invoice_amount`がDBの請求内容に一致しない場合は`400 Bad Request`になります。
 * **トランザクション制御と紐付け（橋渡し）**:
   1. 支払元の残高減算 ＆ 請求元の残高加算
   2. 送金DB (`transactions`) に自動で取引レコードが生成され、一意な `transaction_number`（UUID）と送信日時（`created_at`）が発行される。
-  3. 請求DB (`invoice`) の `invoice_flag` を `paid` に更新。**`transaction_number` に送金DBの取引番号をそのまま記録**し、`paid_time` に送金DBの作成日時（`created_at` のフォーマット文字列）をセットして完全に統一・同期します。
+  3. 請求DB (`invoices`) の `invoice_flag` を`paid`に更新。`transaction_number`へTransactionをOneToOneで紐づけ、`paid_time`にはTransactionの`created_at`と同じ日時値を保存します。
+  4. 上記すべてを`transaction.atomic()`で実行し、Invoice更新を含む一部でも失敗した場合は残高・Transaction作成もロールバックします。
 
 ---
 
@@ -181,13 +186,13 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
   {
     "invoice_list": [
       {
-        "invoice_time": "2026-08-06 10:53",
+        "invoice_time": "2026-08-06 10:53:25.573786",
         "invoice_flag": "notpay",
         "paid_by": null,
         "invoice_number": "33333333-3333-4333-8333-333333333333"
       },
       {
-        "invoice_time": "2026-08-05 18:30",
+        "invoice_time": "2026-08-05 18:30:04.123456",
         "invoice_flag": "paid",
         "paid_by": "654321",
         "invoice_number": "11111111-1111-4111-8111-111111111111"
@@ -195,7 +200,7 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
     ]
   }
   ```
-  * `invoice_time`: 請求作成日時を `YYYY-MM-DD HH:MM` 形式（分まで）に加工。
+  * `invoice_time`: 請求作成日時を `YYYY-MM-DD HH:MM:SS.ffffff`形式（マイクロ秒まで）に加工。
   * リスト内の並び順: 請求作成日時 (`created_time`) が**新しいものが先頭になる降順（`order_by("-created_time")`）**。
   * `paid_by`: 未払いの場合は `null`。
 * **Response 404 Not Found**:
@@ -227,15 +232,15 @@ ReactからURL設定、View、ORM、SQLiteへ処理が進む仕組みは[BACKEND
 | `message` | メッセージ | str |
 | `created_at` | 送金作成日時 (自動生成) | datetime |
 
-### 3. 請求テーブル (モデル: `Invoice`, テーブル名: `invoice`)
+### 3. 請求テーブル (モデル: `Invoice`, テーブル名: `invoices`)
 | カラム名 | 意味 | 型 |
 |---|---|---|
 | `invoice_number` | 請求取引番号 (キー/PK) | str / UUID |
 | `invoice_amount` | 請求金額 | int |
 | `message` | メッセージ | str |
 | `account_number` | 請求元口座番号 (FK) | str |
-| `created_time` | 請求作成日時 (形式: `YYYY-MM-DD HH:MM:SS.ffffff`) | str |
+| `created_time` | 請求作成日時 (自動生成) | datetime |
 | `invoice_flag` | フラグ (`notpay` / `paid`) | str |
-| `paid_time` | 支払日時 (送金DBの `created_at` と完全一致) | str |
+| `paid_time` | 支払日時 (送金DBの `created_at` と完全一致) | datetime / null |
 | `paid_by` | 支払った口座 (FK) | str |
-| `transaction_number` | 支払時に作成された取引番号 (FK - 送金DBの `transaction_number` と完全一致) | str |
+| `transaction_number` | 支払時に作成されたTransaction (OneToOne) | UUID / null |
