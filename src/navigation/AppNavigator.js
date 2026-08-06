@@ -3,6 +3,7 @@ import { useRoutes } from 'react-router';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
+import ProcessPayment from '../ProcessSendMoney/ProcessSendMoney';
 import MakeInvoiceLink from '../MakeInvoiceLink/MakeInvoiceLink';
 import CopyInvoiceLink from '../CopyInvoiceLink/CopyInvoiceLink';
 import { ACCOUNT_NUMBER } from '../account';
@@ -15,6 +16,7 @@ function AppNavigator() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
+  const [invoiceLink, setInvoiceLink] = useState('');
 
   const invoiceScreen = useRoutes([
     {
