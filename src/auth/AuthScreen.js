@@ -18,19 +18,19 @@ function AuthScreen({ onLogin, onSignup }) {
     setFieldErrors({});
     try {
       if (mode === 'login') {
-        await onLogin({ email, password });
+        await onLogin({ mail_address: email, password });
       } else {
         await onSignup({
           account_number: accountNumber,
           user_name: userName,
-          email,
+          mail_address: email,
           password,
         });
       }
     } catch (apiError) {
       const responseErrors = apiError.data || {};
       const nextFieldErrors = responseErrors.errors || responseErrors;
-      const knownFields = ['account_number', 'user_name', 'email', 'password'];
+      const knownFields = ['account_number', 'user_name', 'mail_address', 'password'];
       const hasFieldErrors = knownFields.some((field) => nextFieldErrors[field]);
       if (hasFieldErrors) {
         setFieldErrors(nextFieldErrors);
@@ -124,13 +124,13 @@ function AuthScreen({ onLogin, onSignup }) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
-            aria-describedby={fieldErrors.email ? 'auth-email-error' : undefined}
-            aria-invalid={Boolean(fieldErrors.email)}
+            aria-describedby={fieldErrors.mail_address ? 'auth-email-error' : undefined}
+            aria-invalid={Boolean(fieldErrors.mail_address)}
             required
           />
-          {fieldErrors.email && (
+          {fieldErrors.mail_address && (
             <p id="auth-email-error" className="auth-form__field-error" role="alert">
-              {fieldErrors.email.join(' ')}
+              {fieldErrors.mail_address.join(' ')}
             </p>
           )}
 

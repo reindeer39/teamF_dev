@@ -1,8 +1,7 @@
 import { request } from './client';
 
-
-export function createInvoice(invoiceAmount, message) {
-  return request('/invoices/', {
+export function createInvoice(accountNumber, invoiceAmount, message) {
+  return request(`/user/${encodeURIComponent(accountNumber)}/invoice_request`, {
     method: 'POST',
     body: JSON.stringify({
       invoice_amount: invoiceAmount,
@@ -11,16 +10,17 @@ export function createInvoice(invoiceAmount, message) {
   });
 }
 
-export function getMyInvoices() {
-  return request('/invoices/');
+export function getMyInvoices(accountNumber) {
+  return request(`/user/${encodeURIComponent(accountNumber)}/invoice_list`);
 }
 
-export function getInvoice(invoiceNumber) {
-  return request(`/invoices/${encodeURIComponent(invoiceNumber)}/`);
+export function getInvoiceInfo(invoiceNumber) {
+  return request(`/${encodeURIComponent(invoiceNumber)}/get_inf`);
 }
 
-export function payInvoice(invoiceNumber) {
-  return request(`/invoices/${encodeURIComponent(invoiceNumber)}/pay/`, {
+export function payInvoice(invoiceNumber, payload) {
+  return request(`/${encodeURIComponent(invoiceNumber)}/pay`, {
     method: 'POST',
+    body: JSON.stringify(payload),
   });
 }

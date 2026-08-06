@@ -32,7 +32,7 @@ class SignupSerializer(serializers.Serializer):
             "max_length": "表示名は100文字以内にしてください。",
         },
     )
-    email = serializers.EmailField(
+    mail_address = serializers.EmailField(
         max_length=User._meta.get_field("username").max_length,
         trim_whitespace=True,
         error_messages={
@@ -65,18 +65,18 @@ class SignupSerializer(serializers.Serializer):
             raise serializers.ValidationError("表示名を入力してください。")
         return value
 
-    def validate_email(self, value):
-        normalized_email = value.strip().lower()
-        if User.objects.filter(email__iexact=normalized_email).exists():
+    def validate_mail_address(self, value):
+        normalized_mail_address = value.strip().lower()
+        if User.objects.filter(email__iexact=normalized_mail_address).exists():
             raise serializers.ValidationError(
                 "このメールアドレスは既に使用されています。"
             )
-        return normalized_email
+        return normalized_mail_address
 
     def validate(self, attrs):
         candidate_user = User(
-            username=attrs.get("email", ""),
-            email=attrs.get("email", ""),
+            username=attrs.get("mail_address", ""),
+            email=attrs.get("mail_address", ""),
         )
         try:
             validate_password(attrs["password"], user=candidate_user)

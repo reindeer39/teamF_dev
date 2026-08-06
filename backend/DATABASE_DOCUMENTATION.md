@@ -53,6 +53,36 @@ DB: SQLite (`backend/db.sqlite3`)
 
 ---
 
+## 3. `invoices` テーブル (`Invoice` モデル)
+
+請求リンクの情報を保存する。
+
+| カラム名 | 型 | 制約 | 意味 |
+|---|---|---|---|
+| `invoice_number` | UUIDField | PK, default=uuid4, editable不可 | 請求番号（URLに使うUUID） |
+| `invoice_amount` | PositiveBigIntegerField | MinValueValidator(1) | 請求金額 |
+| `message` | CharField(max_length=200) | blank可, default="" | メッセージ |
+| `account_number` | ForeignKey → `Account` | on_delete=PROTECT, related_name=`issued_invoices` | 請求元口座 |
+| `created_time` | DateTimeField | auto_now_add | 請求作成日時 |
+| `invoice_flag` | CharField(choices) | `notpay` / `paid`, default=`notpay` | 支払状態 |
+| `paid_time` | DateTimeField | null可 | 支払日時（Transaction.created_atと一致） |
+| `paid_by` | ForeignKey → `Account` | on_delete=PROTECT, null可, related_name=`paid_invoices` | 支払口座 |
+| `transaction_number` | OneToOneField → `Transaction` | on_delete=PROTECT, null可, related_name=`invoice` | 支払時に作成されたTransaction |
+
+### 制約
+
+- `invoice_amount_gte_1` — `invoice_amount >= 1`
+- `invoice_flag_valid` — `invoice_flag`は`notpay`か`paid`のみ
+- `invoice_payment_fields_match_flag` — `notpay`なら`paid_time`/`paid_by`/`transaction_number`は全てnull、`paid`なら全て必須
+- `invoice_issuer_payer_different` — 請求元(`account_number`)と支払口座(`paid_by`)は別口座
+- モデルの`clean()`でも同じ組み合わせを検証する（`full_clean()`経由で保存時にチェック）
+
+### 並び順
+
+`Meta.ordering = ["-created_time"]`（新しい請求が先頭）
+
+---
+
 ## ER概要
 
 ```
@@ -60,12 +90,21 @@ Account (accounts)
   account_number (PK)
   auth_user_id → auth_user (CASCADE, OneToOne, related_name=bank_account)
      ├─< sent_transactions ─── Transaction.sender
-     └─< received_transactions ─ Transaction.recipient
+     ├─< received_transactions ─ Transaction.recipient
+     ├─< issued_invoices ─── Invoice.account_number
+     └─< paid_invoices ──── Invoice.paid_by
 
 Transaction (transactions)
   transaction_number (PK)
   sender      → Account (PROTECT)
   recipient   → Account (PROTECT)
+     └─ invoice (OneToOne) ← Invoice.transaction_number
+
+Invoice (invoices)
+  invoice_number (PK)
+  account_number      → Account (PROTECT, 請求元)
+  paid_by             → Account (PROTECT, 支払口座, null可)
+  transaction_number  → Transaction (PROTECT, OneToOne, null可)
 ```
 
 ---

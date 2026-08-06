@@ -532,8 +532,14 @@ class InvoiceAPITests(APITestCase):
     """請求の作成・取得・支払い・一覧がSQLiteと連携することを確認する。"""
 
     def setUp(self):
+        self.issuer_user = User.objects.create_user(
+            username="invoice-issuer@example.com",
+            email="invoice-issuer@example.com",
+            password="strong-test-pass",
+        )
         self.issuer = Account.objects.create(
             account_number="5000001",
+            auth_user=self.issuer_user,
             user_name="請求元",
             account_balance=1000,
         )
@@ -542,6 +548,10 @@ class InvoiceAPITests(APITestCase):
             user_name="支払元",
             account_balance=10000,
         )
+
+    def _authenticate_as_issuer(self):
+        token = Token.objects.create(user=self.issuer_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
 
     def _create_invoice(self, amount=3000, message="会食代"):
         return Invoice.objects.create(
@@ -560,7 +570,30 @@ class InvoiceAPITests(APITestCase):
         data.update(overrides)
         return data
 
+    def test_invoice_request_requires_authentication(self):
+        response = self.client.post(
+            "/api/user/5000001/invoice_request",
+            {"invoice_amount": 2500, "message": "夕食代"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_invoice_request_rejects_other_account(self):
+        self._authenticate_as_issuer()
+
+        response = self.client.post(
+            "/api/user/5000002/invoice_request",
+            {"invoice_amount": 2500, "message": "夕食代"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Invoice.objects.count(), 0)
+
     def test_invoice_request_creates_database_record_and_link(self):
+        self._authenticate_as_issuer()
+
         response = self.client.post(
             "/api/user/5000001/invoice_request",
             {"invoice_amount": 2500, "message": "夕食代"},
@@ -580,6 +613,8 @@ class InvoiceAPITests(APITestCase):
         )
 
     def test_invoice_request_rejects_invalid_amount(self):
+        self._authenticate_as_issuer()
+
         for amount in (0, -1, "3000"):
             with self.subTest(amount=amount):
                 response = self.client.post(
@@ -711,12 +746,25 @@ class InvoiceAPITests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Transaction.objects.count(), 0)
 
+    def test_invoice_list_requires_authentication(self):
+        response = self.client.get("/api/user/5000001/invoice_list")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_invoice_list_rejects_other_account(self):
+        self._authenticate_as_issuer()
+
+        response = self.client.get("/api/user/5000002/invoice_list")
+
+        self.assertEqual(response.status_code, 403)
+
     def test_invoice_list_reads_database_in_newest_first_order(self):
         older = self._create_invoice(message="古い請求")
         newer = self._create_invoice(message="新しい請求")
         Invoice.objects.filter(pk=older.pk).update(
             created_time=timezone.now() - timedelta(days=1)
         )
+        self._authenticate_as_issuer()
 
         response = self.client.get("/api/user/5000001/invoice_list")
 
@@ -760,7 +808,7 @@ class AuthenticationAPITests(APITestCase):
         data = {
             "account_number": "4200001",
             "user_name": "新規利用者",
-            "email": "new-user@example.com",
+            "mail_address": "new-user@example.com",
             "password": "Correct-Horse-57!",
         }
         data.update(overrides)
@@ -768,7 +816,7 @@ class AuthenticationAPITests(APITestCase):
 
     def test_signup_creates_user_account_and_token(self):
         response = self.client.post(
-            "/api/auth/signup/",
+            "/api/make_account",
             self.signup_data(),
             format="json",
         )
@@ -780,12 +828,12 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(created_user.bank_account.account_balance, 0)
         self.assertEqual(created_user.bank_account.account_number, "4200001")
         self.assertEqual(response.data["token"], created_user.auth_token.key)
-        self.assertEqual(response.data["email"], "new-user@example.com")
+        self.assertEqual(response.data["mail_address"], "new-user@example.com")
         self.assertNotIn("password", response.data)
         self.assertNotIn("password", response.data["account"])
 
     def test_signup_creates_general_user_permissions(self):
-        self.client.post("/api/auth/signup/", self.signup_data(), format="json")
+        self.client.post("/api/make_account", self.signup_data(), format="json")
 
         created_user = User.objects.get(email="new-user@example.com")
         self.assertTrue(created_user.is_active)
@@ -793,7 +841,7 @@ class AuthenticationAPITests(APITestCase):
         self.assertFalse(created_user.is_superuser)
 
     def test_signup_links_user_and_account_one_to_one(self):
-        self.client.post("/api/auth/signup/", self.signup_data(), format="json")
+        self.client.post("/api/make_account", self.signup_data(), format="json")
 
         created_user = User.objects.get(email="new-user@example.com")
         account = Account.objects.get(account_number="4200001")
@@ -802,11 +850,11 @@ class AuthenticationAPITests(APITestCase):
 
     def test_signup_saves_normalized_values_in_separate_models(self):
         self.client.post(
-            "/api/auth/signup/",
+            "/api/make_account",
             self.signup_data(
                 account_number=" 0123456 ",
                 user_name=" 新規利用者 ",
-                email=" NEW-USER@Example.COM ",
+                mail_address=" NEW-USER@Example.COM ",
             ),
             format="json",
         )
@@ -822,7 +870,7 @@ class AuthenticationAPITests(APITestCase):
     def test_signup_hashes_password_and_account_has_no_password_field(self):
         plain_password = "Correct-Horse-57!"
         self.client.post(
-            "/api/auth/signup/",
+            "/api/make_account",
             self.signup_data(password=plain_password),
             format="json",
         )
@@ -834,21 +882,21 @@ class AuthenticationAPITests(APITestCase):
 
     def test_signup_rejects_duplicate_email_without_creating_account(self):
         response = self.client.post(
-            "/api/auth/signup/",
-            self.signup_data(email="LOGIN@example.com"),
+            "/api/make_account",
+            self.signup_data(mail_address="LOGIN@example.com"),
             format="json",
         )
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
-            response.data["email"],
+            response.data["mail_address"],
             ["このメールアドレスは既に使用されています。"],
         )
         self.assertEqual(Account.objects.count(), 2)
 
     def test_signup_rejects_duplicate_account_number(self):
         response = self.client.post(
-            "/api/auth/signup/",
+            "/api/make_account",
             self.signup_data(account_number="4100001"),
             format="json",
         )
@@ -862,7 +910,7 @@ class AuthenticationAPITests(APITestCase):
 
     def test_signup_rejects_invalid_account_number(self):
         response = self.client.post(
-            "/api/auth/signup/",
+            "/api/make_account",
             self.signup_data(account_number="0012A45"),
             format="json",
         )
@@ -872,17 +920,17 @@ class AuthenticationAPITests(APITestCase):
 
     def test_signup_rejects_invalid_email(self):
         response = self.client.post(
-            "/api/auth/signup/",
-            self.signup_data(email="not-an-email"),
+            "/api/make_account",
+            self.signup_data(mail_address="not-an-email"),
             format="json",
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("email", response.data)
+        self.assertIn("mail_address", response.data)
 
     def test_signup_rejects_weak_password(self):
         response = self.client.post(
-            "/api/auth/signup/",
+            "/api/make_account",
             self.signup_data(password="12345678"),
             format="json",
         )
@@ -894,7 +942,7 @@ class AuthenticationAPITests(APITestCase):
     @patch("api.views.Account.objects.create", side_effect=IntegrityError("failure"))
     def test_signup_rolls_back_user_if_account_creation_fails(self, _mock_create):
         response = self.client.post(
-            "/api/auth/signup/", self.signup_data(), format="json"
+            "/api/make_account", self.signup_data(), format="json"
         )
 
         self.assertEqual(response.status_code, 400)
@@ -902,25 +950,25 @@ class AuthenticationAPITests(APITestCase):
 
     def test_login_returns_token_and_account(self):
         response = self.client.post(
-            "/api/auth/login/",
-            {"email": "LOGIN@example.com", "password": "strong-test-pass"},
+            "/api/login",
+            {"mail_address": "LOGIN@example.com", "password": "strong-test-pass"},
             format="json",
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["account"]["account_number"], "4100001")
-        self.assertEqual(response.data["email"], "login@example.com")
+        self.assertEqual(response.data["mail_address"], "login@example.com")
         self.assertTrue(Token.objects.filter(key=response.data["token"]).exists())
 
     def test_login_failure_does_not_reveal_invalid_field(self):
         wrong_password_response = self.client.post(
-            "/api/auth/login/",
-            {"email": "login@example.com", "password": "wrong-password"},
+            "/api/login",
+            {"mail_address": "login@example.com", "password": "wrong-password"},
             format="json",
         )
         unknown_email_response = self.client.post(
-            "/api/auth/login/",
-            {"email": "unknown@example.com", "password": "strong-test-pass"},
+            "/api/login",
+            {"mail_address": "unknown@example.com", "password": "strong-test-pass"},
             format="json",
         )
 
@@ -941,8 +989,8 @@ class AuthenticationAPITests(APITestCase):
         )
 
         response = self.client.post(
-            "/api/auth/login/",
-            {"email": "no-account@example.com", "password": "strong-test-pass"},
+            "/api/login",
+            {"mail_address": "no-account@example.com", "password": "strong-test-pass"},
             format="json",
         )
 
@@ -963,7 +1011,7 @@ class AuthenticationAPITests(APITestCase):
         response = self.client.get("/api/auth/me/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["email"], "login@example.com")
+        self.assertEqual(response.data["mail_address"], "login@example.com")
         self.assertEqual(response.data["account_number"], "4100001")
         self.assertEqual(response.data["account"]["account_number"], "4100001")
         self.assertNotIn("password", response.data)
@@ -989,7 +1037,7 @@ class AuthenticationAPITests(APITestCase):
         self._authenticate()
 
         response = self.client.post(
-            "/api/transfers/4100002",
+            "/api/user/4100001/4100002/transfer",
             {"transfer_amount": 750, "message": "認証送金"},
             format="json",
         )
@@ -1000,151 +1048,6 @@ class AuthenticationAPITests(APITestCase):
         self.assertEqual(transfer.recipient, self.recipient)
         self.account.refresh_from_db()
         self.assertEqual(self.account.account_balance, 9250)
-
-
-class AuthenticatedInvoiceAPITests(APITestCase):
-    """React請求画面用APIが認証口座とInvoice DBを使用することを確認する。"""
-
-    def setUp(self):
-        self.issuer_user = User.objects.create_user(
-            username="invoice-issuer@example.com",
-            email="invoice-issuer@example.com",
-            password="strong-test-pass",
-        )
-        self.issuer = Account.objects.create(
-            account_number="4300001",
-            auth_user=self.issuer_user,
-            user_name="請求者",
-            account_balance=1000,
-        )
-        self.payer_user = User.objects.create_user(
-            username="invoice-payer@example.com",
-            email="invoice-payer@example.com",
-            password="strong-test-pass",
-        )
-        self.payer = Account.objects.create(
-            account_number="4300002",
-            auth_user=self.payer_user,
-            user_name="支払者",
-            account_balance=10000,
-        )
-
-    def authenticate(self, user):
-        token = Token.objects.create(user=user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
-
-    def test_authenticated_user_creates_invoice_for_own_account(self):
-        self.authenticate(self.issuer_user)
-
-        response = self.client.post(
-            "/api/invoices/",
-            {"invoice_amount": 2500, "message": "夕食代"},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        invoice = Invoice.objects.get(invoice_number=response.data["invoice_number"])
-        self.assertEqual(invoice.account_number, self.issuer)
-        self.assertEqual(invoice.invoice_amount, 2500)
-        self.assertEqual(invoice.message, "夕食代")
-        self.assertEqual(
-            response.data["invoice_link"],
-            f"http://localhost:3000/invoice/{invoice.invoice_number}",
-        )
-
-    def test_invoice_collection_requires_authentication(self):
-        response = self.client.get("/api/invoices/")
-
-        self.assertEqual(response.status_code, 401)
-
-    def test_invoice_list_returns_only_logged_in_users_invoices(self):
-        mine = Invoice.objects.create(
-            invoice_amount=2500,
-            message="自分の請求",
-            account_number=self.issuer,
-        )
-        Invoice.objects.create(
-            invoice_amount=3000,
-            message="他人の請求",
-            account_number=self.payer,
-        )
-        self.authenticate(self.issuer_user)
-
-        response = self.client.get("/api/invoices/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data["invoice_list"]), 1)
-        self.assertEqual(
-            response.data["invoice_list"][0]["invoice_number"], str(mine.invoice_number)
-        )
-        self.assertEqual(response.data["invoice_list"][0]["message"], "自分の請求")
-
-    def test_invoice_detail_uses_uuid_and_returns_database_data(self):
-        invoice = Invoice.objects.create(
-            invoice_amount=2500,
-            message="詳細確認",
-            account_number=self.issuer,
-        )
-        self.authenticate(self.payer_user)
-
-        response = self.client.get(f"/api/invoices/{invoice.invoice_number}/")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["invoice_amount"], 2500)
-        self.assertEqual(response.data["message"], "詳細確認")
-        self.assertEqual(response.data["issuer"]["account_number"], "4300001")
-
-    def test_payment_uses_logged_in_account_and_updates_all_database_records(self):
-        invoice = Invoice.objects.create(
-            invoice_amount=2500,
-            message="支払い確認",
-            account_number=self.issuer,
-        )
-        self.authenticate(self.payer_user)
-
-        response = self.client.post(
-            f"/api/invoices/{invoice.invoice_number}/pay/", {}, format="json"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        invoice.refresh_from_db()
-        self.issuer.refresh_from_db()
-        self.payer.refresh_from_db()
-        self.assertEqual(invoice.invoice_flag, Invoice.InvoiceFlag.PAID)
-        self.assertEqual(invoice.paid_by, self.payer)
-        self.assertIsNotNone(invoice.paid_time)
-        self.assertIsNotNone(invoice.transaction_number)
-        self.assertEqual(invoice.transaction_number.sender, self.payer)
-        self.assertEqual(invoice.transaction_number.recipient, self.issuer)
-        self.assertEqual(self.payer.account_balance, 7500)
-        self.assertEqual(self.issuer.account_balance, 3500)
-        self.assertEqual(
-            response.data["transaction_number"],
-            str(invoice.transaction_number_id),
-        )
-
-        self.client.credentials()
-        self.authenticate(self.issuer_user)
-        list_response = self.client.get("/api/invoices/")
-        paid_invoice = list_response.data["invoice_list"][0]
-        self.assertEqual(paid_invoice["invoice_flag"], "paid")
-        self.assertEqual(paid_invoice["paid_by"]["account_number"], "4300002")
-        self.assertEqual(paid_invoice["paid_by"]["user_name"], "支払者")
-
-    def test_issuer_cannot_pay_own_invoice(self):
-        invoice = Invoice.objects.create(
-            invoice_amount=500,
-            account_number=self.issuer,
-        )
-        self.authenticate(self.issuer_user)
-
-        response = self.client.post(
-            f"/api/invoices/{invoice.invoice_number}/pay/", {}, format="json"
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(Transaction.objects.count(), 0)
-
 
 class TransferAPITests(APITestCase):
     """HTTPリクエスト→View→ORM→テストDB→レスポンスの全経路を確認する。"""

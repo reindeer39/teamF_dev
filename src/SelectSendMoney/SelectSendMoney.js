@@ -3,7 +3,7 @@ import { getRecipientList } from '../api/accounts';
 import userIcon from '../images/human1.png';
 import './SelectSendMoney.css';
 
-function SelectSendMoney({ onSelectRecipient, onBack }) {
+function SelectSendMoney({ accountNumber, onSelectRecipient, onBack }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,7 +12,7 @@ function SelectSendMoney({ onSelectRecipient, onBack }) {
     let active = true;
 
     // API連携ポイント: 送金元以外の口座をDBから取得して一覧表示する。
-    getRecipientList()
+    getRecipientList(accountNumber)
       .then((data) => {
         if (active) setUsers(data.recipient_list);
       })
@@ -26,7 +26,7 @@ function SelectSendMoney({ onSelectRecipient, onBack }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [accountNumber]);
 
   return (
     <main className="select-send-money">

@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AppNavigator from './AppNavigator';
-import { getMySummary, getRecipientInfo, getRecipientList } from '../api/accounts';
+import { getUserSummary, getRecipientInfo, getRecipientList } from '../api/accounts';
 import { createTransfer } from '../api/transfers';
-import { createInvoice, getInvoice, getMyInvoices } from '../api/invoices';
+import { createInvoice, getInvoiceInfo, getMyInvoices } from '../api/invoices';
 import { useAuth } from '../auth/AuthContext';
 
 jest.mock('../api/accounts');
@@ -17,6 +17,12 @@ const summary = {
   user_name: '山田太郎',
   account_balance: 97000,
 };
+const otherAccountSummary = {
+  account_number: '1000002',
+  user_icon: '/icons/user2.png',
+  user_name: '佐藤花子',
+  account_balance: 50000,
+};
 const signOut = jest.fn();
 
 beforeEach(() => {
@@ -28,7 +34,9 @@ beforeEach(() => {
     signup: jest.fn(),
     signOut,
   });
-  getMySummary.mockResolvedValue(summary);
+  getUserSummary.mockImplementation((accountNumber) =>
+    Promise.resolve(accountNumber === '1000002' ? otherAccountSummary : summary)
+  );
   getRecipientList.mockResolvedValue({
     recipient_list: [
       {
@@ -54,20 +62,14 @@ beforeEach(() => {
     sender_account_balance: 94000,
   });
   createInvoice.mockResolvedValue({
-    invoice_number: '33333333-3333-4333-8333-333333333333',
     invoice_link: 'http://localhost:3000/invoice/33333333-3333-4333-8333-333333333333',
   });
   getMyInvoices.mockResolvedValue({ invoice_list: [] });
-  getInvoice.mockResolvedValue({
-    invoice_number: '33333333-3333-4333-8333-333333333333',
-    invoice_amount: 2500,
-    message: '夕食代',
+  getInvoiceInfo.mockResolvedValue({
+    invoice_account_number: '1000001',
+    invoice_amount: '2500',
+    invoice_message: '夕食代',
     invoice_flag: 'notpay',
-    issuer: {
-      account_number: '1000001',
-      user_name: '山田太郎',
-      user_icon: '/icons/user1.png',
-    },
   });
 });
 
@@ -91,7 +93,7 @@ test('DBから取得した口座情報と操作ボタンを表示する', async 
     expect(screen.getByRole('button', { name: '送金する' })).toBeEnabled();
   });
   expect(screen.getByRole('button', { name: '請求する' })).toBeInTheDocument();
-  expect(getMySummary).toHaveBeenCalledWith();
+  expect(getUserSummary).toHaveBeenCalledWith('1000001');
 });
 
 test('請求するボタンから請求リンク作成画面へ遷移し、戻ることができる', async () => {
@@ -118,7 +120,9 @@ test('請求リンク作成APIのUUIDリンクをコピー画面へ表示する'
   });
   fireEvent.click(screen.getByRole('button', { name: 'リンク作成' }));
 
-  await waitFor(() => expect(createInvoice).toHaveBeenCalledWith(2500, '夕食代'));
+  await waitFor(() =>
+    expect(createInvoice).toHaveBeenCalledWith('1000001', 2500, '夕食代')
+  );
   expect(
     await screen.findByText(
       'http://localhost:3000/invoice/33333333-3333-4333-8333-333333333333'
@@ -138,7 +142,7 @@ test('コピー画面からログアウトして同じ請求URLを別アカウ�
   );
 
   await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
-  await waitFor(() => expect(getInvoice).toHaveBeenCalledWith(
+  await waitFor(() => expect(getInvoiceInfo).toHaveBeenCalledWith(
     '33333333-3333-4333-8333-333333333333'
   ));
 });
@@ -151,7 +155,7 @@ test('請求状態確認画面がDB取得APIを呼ぶ', async () => {
   expect(screen.getByText(/請求元：/)).toBeInTheDocument();
   expect(screen.getByText('山田太郎', { selector: 'strong' })).toBeInTheDocument();
   expect(await screen.findByText('請求はありません。')).toBeInTheDocument();
-  expect(getMyInvoices).toHaveBeenCalledTimes(1);
+  expect(getMyInvoices).toHaveBeenCalledWith('1000001');
 });
 
 test('請求元の確認画面へ支払状態と支払者アイコンを反映し再取得できる', async () => {
@@ -160,24 +164,24 @@ test('請求元の確認画面へ支払状態と支払者アイコンを反映�
       {
         invoice_number: '44444444-4444-4444-8444-444444444444',
         invoice_time: '2026-08-06 02:23:25.573786',
-        invoice_amount: 3000,
-        message: '昼食代',
         invoice_flag: 'paid',
-        paid_by: {
-          account_number: '1000002',
-          user_name: '佐藤花子',
-          user_icon: '/icons/user2.png',
-          account_balance: 50000,
-        },
+        paid_by: '1000002',
       },
     ],
+  });
+  getInvoiceInfo.mockResolvedValue({
+    invoice_account_number: '1000001',
+    invoice_amount: '3000',
+    invoice_message: '昼食代',
+    invoice_flag: 'paid',
   });
   renderNavigator();
   fireEvent.click(await screen.findByRole('button', { name: '請求状態確認' }));
 
   expect(await screen.findByText('支払済み')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /請求詳細を開く/ }));
-  expect(screen.getByText('佐藤花子')).toBeInTheDocument();
+
+  expect(await screen.findByText('佐藤花子')).toBeInTheDocument();
   expect(screen.getByAltText('佐藤花子のアイコン').getAttribute('src')).toContain(
     'human2'
   );
@@ -204,6 +208,7 @@ test('送金ボタンからAPIを呼び出して送金完了まで遷移する',
 
   await waitFor(() => {
     expect(createTransfer).toHaveBeenCalledWith(
+      '1000001',
       '1000002',
       3000,
       '昼食代'

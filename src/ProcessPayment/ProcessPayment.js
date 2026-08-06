@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { getMySummary } from '../api/accounts';
-import { getInvoice, payInvoice } from '../api/invoices';
+import { getUserSummary } from '../api/accounts';
+import { getInvoiceInfo, payInvoice } from '../api/invoices';
 import requesterDefaultIcon from '../images/human2.png';
 import NavigationButton from '../components/NavigationButton';
 import { resolveUserIcon } from '../utils/resolveUserIcon';
@@ -16,9 +16,10 @@ function formatYen(value) {
     : '---円';
 }
 
-function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
+function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
   const navigate = useNavigate();
-  const [invoice, setInvoice] = useState(null);
+  const [invoiceInfo, setInvoiceInfo] = useState(null);
+  const [issuer, setIssuer] = useState(null);
   const [payerAccount, setPayerAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -31,30 +32,40 @@ function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
     setLoading(true);
     setError('');
 
-    Promise.all([getInvoice(invoiceNumber), getMySummary()])
-      .then(([invoiceData, accountData]) => {
+    // API連携ポイント: Miroの設計通り、請求情報・請求元プロフィール・
+    // 自分の口座情報を別々のAPIから取得する。
+    async function load() {
+      try {
+        const [info, payer] = await Promise.all([
+          getInvoiceInfo(invoiceNumber),
+          getUserSummary(myAccountNumber),
+        ]);
+        const issuerData = await getUserSummary(info.invoice_account_number);
         if (!active) return;
-        setInvoice(invoiceData);
-        setPayerAccount(accountData);
-      })
-      .catch((apiError) => {
+        setInvoiceInfo(info);
+        setPayerAccount(payer);
+        setIssuer(issuerData);
+      } catch (apiError) {
         if (active) setError(`請求情報を取得できませんでした: ${apiError.message}`);
-      })
-      .finally(() => {
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    }
+
+    load();
 
     return () => {
       active = false;
     };
-  }, [invoiceNumber]);
+  }, [invoiceNumber, myAccountNumber]);
 
-  const isPaid = invoice?.invoice_flag === 'paid';
+  const invoiceAmount = Number(invoiceInfo?.invoice_amount);
+  const isPaid = invoiceInfo?.invoice_flag === 'paid';
   const isOwnInvoice = Boolean(
-    invoice && payerAccount && invoice.issuer.account_number === payerAccount.account_number
+    invoiceInfo && payerAccount && invoiceInfo.invoice_account_number === payerAccount.account_number
   );
   const hasEnoughBalance = Boolean(
-    invoice && payerAccount && payerAccount.account_balance >= invoice.invoice_amount
+    invoiceInfo && payerAccount && payerAccount.account_balance >= invoiceAmount
   );
   const canPay = !loading && !submitting && !error && !isPaid && !isOwnInvoice && hasEnoughBalance;
 
@@ -63,7 +74,13 @@ function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
     setSubmitting(true);
     setError('');
     try {
-      setResult(await payInvoice(invoiceNumber));
+      const paymentResult = await payInvoice(invoiceNumber, {
+        my_account_number: myAccountNumber,
+        invoice_account_number: invoiceInfo.invoice_account_number,
+        invoice_amount: invoiceAmount,
+        message: invoiceInfo.invoice_message,
+      });
+      setResult(paymentResult);
     } catch (apiError) {
       setError(`支払いできませんでした: ${apiError.message}`);
     } finally {
@@ -94,7 +111,7 @@ function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
           </strong>
         </section>
         <p className="payment-complete__recipient">
-          {invoice.issuer.user_name}さんへ支払いました。
+          {issuer.user_name}さんへ支払いました。
         </p>
         <p className="payment-complete__transaction">
           取引番号：{result.transaction_number}
@@ -113,11 +130,11 @@ function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
         <div className="payment-screen__requester">
           <img
             className="payment-screen__icon"
-            src={resolveUserIcon(invoice?.issuer.user_icon, requesterDefaultIcon)}
-            alt={invoice ? `${invoice.issuer.user_name}のアイコン` : ''}
+            src={resolveUserIcon(issuer?.user_icon, requesterDefaultIcon)}
+            alt={issuer ? `${issuer.user_name}のアイコン` : ''}
           />
           <strong className="payment-screen__name">
-            {loading ? '読み込み中...' : invoice?.issuer.user_name || '---'}
+            {loading ? '読み込み中...' : issuer?.user_name || '---'}
           </strong>
         </div>
       </section>
@@ -132,13 +149,13 @@ function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
         <div className="payment-screen__row">
           <p className="payment-screen__label">請求金額</p>
           <p className="payment-screen__value payment-screen__amount">
-            {formatYen(invoice?.invoice_amount)}
+            {formatYen(invoiceAmount)}
           </p>
         </div>
         <div className="payment-screen__message-block">
           <p className="payment-screen__label">メッセージ</p>
           <p className="payment-screen__message">
-            {invoice?.message || 'メッセージはありません'}
+            {invoiceInfo?.invoice_message || 'メッセージはありません'}
           </p>
         </div>
       </section>
@@ -152,7 +169,7 @@ function ProcessPayment({ invoiceNumber, onSwitchAccount }) {
           自分が発行した請求は支払えません。支払者のアカウントへ切り替えてください。
         </p>
       )}
-      {!loading && invoice && !isPaid && !isOwnInvoice && !hasEnoughBalance && (
+      {!loading && invoiceInfo && !isPaid && !isOwnInvoice && !hasEnoughBalance && (
         <p className="payment-screen__warning" role="alert">
           口座残高が不足しているため支払いできません。
         </p>

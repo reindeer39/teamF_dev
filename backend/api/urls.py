@@ -7,12 +7,6 @@ config/urls.pyが`/api/`を取り除いた残りのURLをこのファイルへ�
 from django.urls import path
 
 from api.views import (
-    AuthenticatedInvoiceCollectionView,
-    AuthenticatedInvoiceDetailView,
-    AuthenticatedInvoicePayView,
-    AuthenticatedRecipientInfoView,
-    AuthenticatedRecipientListView,
-    AuthenticatedTransferView,
     CurrentUserView,
     InvoiceInfoView,
     InvoiceListView,
@@ -20,7 +14,6 @@ from api.views import (
     InvoiceRequestView,
     LoginView,
     LogoutView,
-    MyAccountSummaryView,
     RecipientInfoView,
     RecipientListView,
     SignupView,
@@ -29,46 +22,14 @@ from api.views import (
 )
 
 urlpatterns = [
-    path("auth/signup/", SignupView.as_view(), name="signup"),
-    path("auth/login/", LoginView.as_view(), name="login"),
+    # Step 10: 会員登録・ログイン。
+    path("make_account", SignupView.as_view(), name="signup"),
+    path("login", LoginView.as_view(), name="login"),
+    # 仕様にはないが、ログイン状態の保持に必要な補助エンドポイント。
     path("auth/logout/", LogoutView.as_view(), name="logout"),
-    path("auth/me/", CurrentUserView.as_view(), name="current-user"),
-    # 既存React・外部クライアント向けの末尾スラッシュなしURLも維持する。
-    path("auth/signup", SignupView.as_view(), name="signup-legacy"),
-    path("auth/login", LoginView.as_view(), name="login-legacy"),
     path("auth/logout", LogoutView.as_view(), name="logout-legacy"),
+    path("auth/me/", CurrentUserView.as_view(), name="current-user"),
     path("auth/me", CurrentUserView.as_view(), name="current-user-legacy"),
-    path("account/summary", MyAccountSummaryView.as_view(), name="my-summary"),
-    path(
-        "invoices/",
-        AuthenticatedInvoiceCollectionView.as_view(),
-        name="authenticated-invoice-collection",
-    ),
-    path(
-        "invoices/<uuid:invoice_number>/",
-        AuthenticatedInvoiceDetailView.as_view(),
-        name="authenticated-invoice-detail",
-    ),
-    path(
-        "invoices/<uuid:invoice_number>/pay/",
-        AuthenticatedInvoicePayView.as_view(),
-        name="authenticated-invoice-pay",
-    ),
-    path(
-        "account/recipients",
-        AuthenticatedRecipientListView.as_view(),
-        name="authenticated-recipient-list",
-    ),
-    path(
-        "account/recipients/<str:recipient_account_number>",
-        AuthenticatedRecipientInfoView.as_view(),
-        name="authenticated-recipient-info",
-    ),
-    path(
-        "transfers/<str:recipient_account_number>",
-        AuthenticatedTransferView.as_view(),
-        name="authenticated-transfer",
-    ),
     # GET /api/user/1000001/summary → UserSummaryView.get(..., "1000001")
     path(
         "user/<str:account_number>/summary",

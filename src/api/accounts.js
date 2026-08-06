@@ -1,15 +1,15 @@
 import { request } from './client';
 
-export function getMySummary() {
-  return request('/account/summary');
+export function getUserSummary(accountNumber) {
+  return request(`/user/${encodeURIComponent(accountNumber)}/summary`);
 }
 
-export function getRecipientList() {
-  return request('/account/recipients');
+export function getRecipientList(accountNumber) {
+  return request(`/user/${encodeURIComponent(accountNumber)}/recipient_list`);
 }
 
-export function getRecipientInfo(recipientAccountNumber) {
+export function getRecipientInfo(senderAccountNumber, recipientAccountNumber) {
   return request(
-    `/account/recipients/${encodeURIComponent(recipientAccountNumber)}`
+    `/user/${encodeURIComponent(senderAccountNumber)}/${encodeURIComponent(recipientAccountNumber)}/recipient`
   );
 }

@@ -22,10 +22,10 @@ test('保存済みトークンをAPIのAuthorizationヘッダーへ付与する'
     json: async () => ({ account_number: '1000001' }),
   });
 
-  await request('/account/summary');
+  await request('/user/1000001/summary');
 
   expect(fetch).toHaveBeenCalledWith(
-    'http://127.0.0.1:8000/api/account/summary',
+    'http://127.0.0.1:8000/api/user/1000001/summary',
     expect.objectContaining({
       headers: expect.objectContaining({ Authorization: 'Token test-token' }),
     })
@@ -50,7 +50,7 @@ test('フィールド別APIエラーをメッセージとdataへ保持する', a
     }),
   });
 
-  await expect(request('/auth/signup/')).rejects.toMatchObject({
+  await expect(request('/make_account')).rejects.toMatchObject({
     message: 'この口座番号は既に使用されています。',
     data: {
       account_number: ['この口座番号は既に使用されています。'],

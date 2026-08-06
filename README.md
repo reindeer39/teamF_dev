@@ -320,20 +320,20 @@ python manage.py seed_mock_data --reset
 
 | Reactの操作 | API | データベース処理 |
 |---|---|---|
-| 新規登録 | `POST /api/auth/signup/` | 7桁の口座番号・表示名・メール・パスワードからDjango UserとAccountを同時作成 |
-| ログイン | `POST /api/auth/login/` | 認証トークンと口座情報を取得 |
+| 新規登録 | `POST /api/make_account` | 7桁の口座番号・表示名・メール・パスワードからDjango UserとAccountを同時作成 |
+| ログイン | `POST /api/login` | 認証トークンと口座情報を取得 |
 | ログイン状態を復元 | `GET /api/auth/me/` | トークンに紐づく自分のUserとAccountを取得 |
-| トップ画面を表示 | `GET /api/account/summary` | ログイン中の`accounts`を取得 |
-| 「送金する」を押す | `GET /api/account/recipients` | ログイン口座以外のAccountを取得 |
-| 送金先を選択 | `GET /api/account/recipients/{recipient}` | 送金先と送金可能残高を取得 |
-| 金額・メッセージを入力して「送金」を押す | `POST /api/transfers/{recipient}` | 認証ユーザーを送金元として残高更新とTransaction作成 |
-| 「請求する」でリンクを作成 | `POST /api/invoices/` | ログイン口座を請求元としてInvoice作成 |
-| 請求状態を確認 | `GET /api/invoices/` | ログイン口座が発行したInvoice一覧を取得 |
-| `/invoice/{invoice_number}`を開く | `GET /api/invoices/{invoice_number}/` | UUIDから請求元・金額・状態を取得 |
-| 「支払う」を押す | `POST /api/invoices/{invoice_number}/pay/` | ログイン口座の残高、Transaction、Invoiceを一括更新 |
+| トップ画面を表示 | `GET /api/user/{account_number}/summary` | ログイン中の口座を`accounts`から取得 |
+| 「送金する」を押す | `GET /api/user/{account_number}/recipient_list` | ログイン口座以外のAccountを取得 |
+| 送金先を選択 | `GET /api/user/{sender}/{recipient}/recipient` | 送金先と送金可能残高を取得 |
+| 金額・メッセージを入力して「送金」を押す | `POST /api/user/{sender}/{recipient}/transfer` | ログイン口座を送金元として残高更新とTransaction作成 |
+| 「請求する」でリンクを作成 | `POST /api/user/{account_number}/invoice_request` | ログイン口座を請求元としてInvoice作成 |
+| 請求状態を確認 | `GET /api/user/{account_number}/invoice_list` | ログイン口座が発行したInvoice一覧を取得 |
+| `/invoice/{invoice_number}`を開く | `GET /api/{invoice_number}/get_inf`（認証不要） | UUIDから請求元・金額・状態を取得 |
+| 「支払う」を押す | `POST /api/{invoice_number}/pay`（認証不要） | 支払口座の残高、Transaction、Invoiceを一括更新 |
 | ログアウト | `POST /api/auth/logout/` | サーバーとブラウザのトークンを削除 |
 
-固定の`src/account.js`は廃止しました。送金元口座はURLやReactの定数ではなく、AuthorizationヘッダーのトークンからDjangoが確定します。
+固定の`src/account.js`は廃止しました。送金元口座はReactの定数ではなく、ログイン時にAPIから受け取った`account.account_number`をAppNavigatorが保持し、各画面のURL/propsへ渡します。`get_inf`・`pay`はURL(`/{invoice_number}`)から請求を特定するため、ログインしていない相手でも開けます。
 
 ### 画面遷移(ルーティング)の構成
 
@@ -366,10 +366,10 @@ index.js
 ### API連携コードの場所
 
 - `src/api/client.js`: ベースURL、JSON処理、Authorizationヘッダー、共通エラー処理
-- `src/api/auth.js`: signup、login、logout、ログイン状態復元
-- `src/api/accounts.js`: 自分の口座概要、送金先一覧・詳細
-- `src/api/transfers.js`: 送金POST
-- `src/api/invoices.js`: 請求作成・一覧・詳細・支払い
+- `src/api/auth.js`: signup(`/make_account`)、login(`/login`)、logout、ログイン状態復元
+- `src/api/accounts.js`: 口座概要(`/user/{account_number}/summary`)、送金先一覧・詳細
+- `src/api/transfers.js`: 送金POST(`/user/{sender}/{recipient}/transfer`)
+- `src/api/invoices.js`: 請求作成・一覧・請求情報取得・支払い
 - `src/auth/AuthContext.js`: トークン保存とアプリ全体の認証状態
 - `src/auth/AuthScreen.js`: ログイン・新規登録フォーム
 - `src/navigation/AppNavigator.js`: 画面遷移の管理と口座情報の取得
@@ -423,12 +423,12 @@ Django API単体は次のコマンドで確認できます。
 ```bash
 TOKEN=$(curl -s -X POST \
   -H "Content-Type: application/json" \
-  -d '{"email":"yamada@example.com","password":"teamf-dev-pass"}' \
-  http://127.0.0.1:8000/api/auth/login | python -c \
+  -d '{"mail_address":"yamada@example.com","password":"teamf-dev-pass"}' \
+  http://127.0.0.1:8000/api/login | python -c \
   'import json,sys; print(json.load(sys.stdin)["token"])')
 
 curl -H "Authorization: Token $TOKEN" \
-  http://127.0.0.1:8000/api/account/summary
+  http://127.0.0.1:8000/api/user/1000001/summary
 ```
 
 送金POSTはDBの残高と履歴を実際に変更します。開発用データであることを確認してから実行してください。
@@ -438,7 +438,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Token $TOKEN" \
   -d '{"transfer_amount":1000,"message":"API確認"}' \
-  http://127.0.0.1:8000/api/transfers/1000002
+  http://127.0.0.1:8000/api/user/1000001/1000002/transfer
 ```
 
 実行後、Django管理画面で両口座の残高とTransaction履歴を確認できます。自動テストではテスト専用DBを使うため、ローカルの`db.sqlite3`を変更せずに連携を確認できます。

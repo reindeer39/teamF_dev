@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getMyInvoices } from '../api/invoices';
+import { getUserSummary } from '../api/accounts';
+import { getInvoiceInfo, getMyInvoices } from '../api/invoices';
 import { resolveUserIcon } from '../utils/resolveUserIcon';
 import './InvoiceStatusScreen.css';
 
@@ -8,9 +9,11 @@ function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
 }
 
-function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
+function InvoiceStatusScreen({ account, accountNumber, onBack, onSwitchAccount }) {
   const [invoices, setInvoices] = useState([]);
   const [openInvoiceNumber, setOpenInvoiceNumber] = useState(null);
+  const [details, setDetails] = useState({});
+  const [detailLoading, setDetailLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshCount, setRefreshCount] = useState(0);
@@ -19,7 +22,7 @@ function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
     let active = true;
     setLoading(true);
     setError('');
-    getMyInvoices()
+    getMyInvoices(accountNumber)
       .then((data) => {
         if (active) setInvoices(data.invoice_list);
       })
@@ -32,7 +35,7 @@ function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
     return () => {
       active = false;
     };
-  }, [refreshCount]);
+  }, [accountNumber, refreshCount]);
 
   useEffect(() => {
     const refreshOnFocus = () => setRefreshCount((count) => count + 1);
@@ -47,6 +50,37 @@ function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
       window.alert('リンクをコピーしました。');
     } catch (copyError) {
       window.alert(`リンクをコピーできませんでした: ${copyError.message}`);
+    }
+  }
+
+  // API連携ポイント: 一覧APIは金額・メッセージ・支払人情報を含まないため、
+  // 「開く」操作をした請求だけ詳細API(get_inf・summary)を追加で取得する。
+  async function openInvoiceDetails(invoice) {
+    if (openInvoiceNumber === invoice.invoice_number) {
+      setOpenInvoiceNumber(null);
+      return;
+    }
+    setOpenInvoiceNumber(invoice.invoice_number);
+    if (details[invoice.invoice_number]) return;
+
+    setDetailLoading(true);
+    try {
+      const [info, payer] = await Promise.all([
+        getInvoiceInfo(invoice.invoice_number),
+        invoice.paid_by ? getUserSummary(invoice.paid_by) : Promise.resolve(null),
+      ]);
+      setDetails((current) => ({
+        ...current,
+        [invoice.invoice_number]: {
+          amount: Number(info.invoice_amount),
+          message: info.invoice_message,
+          payer,
+        },
+      }));
+    } catch (apiError) {
+      setError(`請求詳細を取得できませんでした: ${apiError.message}`);
+    } finally {
+      setDetailLoading(false);
     }
   }
 
@@ -96,6 +130,7 @@ function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
             const isPaid = invoice.invoice_flag === 'paid';
             const invoiceTime = formatInvoiceTime(invoice.invoice_time);
             const detailsId = `invoice-${invoice.invoice_number}-details`;
+            const detail = details[invoice.invoice_number];
             return (
               <article className="invoice-item" key={invoice.invoice_number}>
                 <div className="invoice-item-summary">
@@ -113,9 +148,7 @@ function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
                     aria-expanded={isOpen}
                     aria-controls={detailsId}
                     aria-label={`${invoiceTime}の請求詳細を${isOpen ? '閉じる' : '開く'}`}
-                    onClick={() => setOpenInvoiceNumber(
-                      isOpen ? null : invoice.invoice_number
-                    )}
+                    onClick={() => openInvoiceDetails(invoice)}
                   >
                     <span
                       className={`invoice-toggle-icon ${
@@ -130,42 +163,47 @@ function InvoiceStatusScreen({ account, onBack, onSwitchAccount }) {
 
                 {isOpen && (
                   <div className="invoice-item-details" id={detailsId}>
-                    {invoice.paid_by && (
-                      <div className="invoice-user-row">
-                        <span className="invoice-payer-label">支払人</span>
-                        <img
-                          className="invoice-face"
-                          src={resolveUserIcon(invoice.paid_by.user_icon)}
-                          alt={`${invoice.paid_by.user_name}のアイコン`}
-                        />
-                        <strong>{invoice.paid_by.user_name}</strong>
-                      </div>
-                    )}
-                    {!isPaid && (
-                      <p className="invoice-awaiting-payment">支払者からの支払い待ちです。</p>
-                    )}
-                    <div
-                      className={`invoice-amount-row ${
-                        isPaid ? 'invoice-amount-row--paid' : 'invoice-amount-row--unpaid'
-                      }`}
-                    >
-                      <p className="invoice-amount">
-                        請求金額：{invoice.invoice_amount.toLocaleString('ja-JP')}円
-                      </p>
-                      {!isPaid && (
-                        <button
-                          className="invoice-copy-link-button"
-                          type="button"
-                          onClick={() => copyInvoiceLink(invoice.invoice_number)}
+                    {!detail && detailLoading && <p>読み込み中...</p>}
+                    {detail && (
+                      <>
+                        {detail.payer && (
+                          <div className="invoice-user-row">
+                            <span className="invoice-payer-label">支払人</span>
+                            <img
+                              className="invoice-face"
+                              src={resolveUserIcon(detail.payer.user_icon)}
+                              alt={`${detail.payer.user_name}のアイコン`}
+                            />
+                            <strong>{detail.payer.user_name}</strong>
+                          </div>
+                        )}
+                        {!isPaid && (
+                          <p className="invoice-awaiting-payment">支払者からの支払い待ちです。</p>
+                        )}
+                        <div
+                          className={`invoice-amount-row ${
+                            isPaid ? 'invoice-amount-row--paid' : 'invoice-amount-row--unpaid'
+                          }`}
                         >
-                          リンクをコピー
-                        </button>
-                      )}
-                    </div>
-                    <label className="invoice-message-label">
-                      メッセージ
-                      <textarea value={invoice.message || ''} readOnly />
-                    </label>
+                          <p className="invoice-amount">
+                            請求金額：{detail.amount.toLocaleString('ja-JP')}円
+                          </p>
+                          {!isPaid && (
+                            <button
+                              className="invoice-copy-link-button"
+                              type="button"
+                              onClick={() => copyInvoiceLink(invoice.invoice_number)}
+                            >
+                              リンクをコピー
+                            </button>
+                          )}
+                        </div>
+                        <label className="invoice-message-label">
+                          メッセージ
+                          <textarea value={detail.message || ''} readOnly />
+                        </label>
+                      </>
+                    )}
                   </div>
                 )}
               </article>

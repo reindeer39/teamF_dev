@@ -1,14 +1,14 @@
 import { request } from './client';
 
 export function login(credentials) {
-  return request('/auth/login/', {
+  return request('/login', {
     method: 'POST',
     body: JSON.stringify(credentials),
   });
 }
 
 export function signup(registration) {
-  return request('/auth/signup/', {
+  return request('/make_account', {
     method: 'POST',
     body: JSON.stringify(registration),
   });

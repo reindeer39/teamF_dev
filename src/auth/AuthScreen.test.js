@@ -25,7 +25,7 @@ test('新規登録で口座番号・表示名・メールアドレス・パス�
     expect(onSignup).toHaveBeenCalledWith({
       account_number: '1234567',
       user_name: '山田太郎',
-      email: 'yamada@example.com',
+      mail_address: 'yamada@example.com',
       password: 'Correct-Horse-57!',
     });
   });
@@ -36,7 +36,7 @@ test('新規登録APIのフィールド別エラーを各入力欄の近くへ�
   const apiError = new Error('登録できませんでした。');
   apiError.data = {
     account_number: ['この口座番号は既に使用されています。'],
-    email: ['このメールアドレスは既に使用されています。'],
+    mail_address: ['このメールアドレスは既に使用されています。'],
   };
   const onSignup = jest.fn().mockRejectedValue(apiError);
 

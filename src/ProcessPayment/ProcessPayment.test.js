@@ -1,32 +1,38 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ProcessPayment from './ProcessPayment';
-import { getMySummary } from '../api/accounts';
-import { getInvoice, payInvoice } from '../api/invoices';
+import { getUserSummary } from '../api/accounts';
+import { getInvoiceInfo, payInvoice } from '../api/invoices';
 
 
 jest.mock('../api/accounts');
 jest.mock('../api/invoices');
 
 const invoiceNumber = '33333333-3333-4333-8333-333333333333';
+const myAccountNumber = '1000002';
 
 beforeEach(() => {
   jest.clearAllMocks();
-  getMySummary.mockResolvedValue({
-    account_number: '1000002',
-    user_name: '支払者',
-    account_balance: 10000,
-  });
-  getInvoice.mockResolvedValue({
-    invoice_number: invoiceNumber,
-    invoice_amount: 2500,
-    message: '夕食代',
+  getInvoiceInfo.mockResolvedValue({
+    invoice_account_number: '1000001',
+    invoice_amount: '2500',
+    invoice_message: '夕食代',
     invoice_flag: 'notpay',
-    issuer: {
-      account_number: '1000001',
-      user_name: '請求者',
-      user_icon: '/icons/user1.png',
-    },
+  });
+  getUserSummary.mockImplementation((accountNumber) => {
+    if (accountNumber === '1000001') {
+      return Promise.resolve({
+        account_number: '1000001',
+        user_name: '請求者',
+        user_icon: '/icons/user1.png',
+        account_balance: 50000,
+      });
+    }
+    return Promise.resolve({
+      account_number: myAccountNumber,
+      user_name: '支払者',
+      account_balance: 10000,
+    });
   });
   payInvoice.mockResolvedValue({
     payment_amount: 2500,
@@ -40,7 +46,11 @@ function renderPayment(props = {}) {
       initialEntries={[`/invoice/${invoiceNumber}`]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
-      <ProcessPayment invoiceNumber={invoiceNumber} {...props} />
+      <ProcessPayment
+        invoiceNumber={invoiceNumber}
+        myAccountNumber={myAccountNumber}
+        {...props}
+      />
     </MemoryRouter>
   );
 }
@@ -55,18 +65,21 @@ test('URLの請求番号からDBの請求内容とログイン口座残高を表
   expect(screen.getByAltText('請求者のアイコン').getAttribute('src')).toContain(
     'human1'
   );
-  expect(getInvoice).toHaveBeenCalledWith(invoiceNumber);
-  expect(getMySummary).toHaveBeenCalledWith();
+  expect(getInvoiceInfo).toHaveBeenCalledWith(invoiceNumber);
+  expect(getUserSummary).toHaveBeenCalledWith(myAccountNumber);
+  expect(getUserSummary).toHaveBeenCalledWith('1000001');
 });
 
 test('請求元本人には別アカウントへ切り替える導線を表示する', async () => {
-  getMySummary.mockResolvedValue({
-    account_number: '1000001',
-    user_name: '請求者',
-    account_balance: 10000,
-  });
+  getUserSummary.mockImplementation(() =>
+    Promise.resolve({
+      account_number: '1000001',
+      user_name: '請求者',
+      account_balance: 10000,
+    })
+  );
   const onSwitchAccount = jest.fn().mockResolvedValue();
-  renderPayment({ onSwitchAccount });
+  renderPayment({ myAccountNumber: '1000001', onSwitchAccount });
 
   expect(
     await screen.findByText(/支払者のアカウントへ切り替えてください/)
@@ -82,7 +95,14 @@ test('支払うボタンで請求支払いAPIを呼び完了結果を表示す�
   await waitFor(() => expect(payButton).toBeEnabled());
   fireEvent.click(payButton);
 
-  await waitFor(() => expect(payInvoice).toHaveBeenCalledWith(invoiceNumber));
+  await waitFor(() =>
+    expect(payInvoice).toHaveBeenCalledWith(invoiceNumber, {
+      my_account_number: myAccountNumber,
+      invoice_account_number: '1000001',
+      invoice_amount: 2500,
+      message: '夕食代',
+    })
+  );
   expect(await screen.findByText('支払いが完了しました')).toBeInTheDocument();
   expect(screen.getByText(/11111111-1111-4111-8111-111111111111/)).toBeInTheDocument();
 });

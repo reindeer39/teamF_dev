@@ -5,7 +5,7 @@ import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
 import AuthScreen from '../auth/AuthScreen';
 import { useAuth } from '../auth/AuthContext';
-import { getMySummary } from '../api/accounts';
+import { getUserSummary } from '../api/accounts';
 import ProcessPayment from '../ProcessPayment/ProcessPayment';
 import MakeInvoiceLink from '../MakeInvoiceLink/MakeInvoiceLink';
 import CopyInvoiceLink from '../CopyInvoiceLink/CopyInvoiceLink';
@@ -24,9 +24,10 @@ function AppNavigator() {
   const [invoiceLink, setInvoiceLink] = useState('');
 
   const invoiceMatch = useMatch('/invoice/:invoiceNumber');
+  const myAccountNumber = session?.account?.account_number;
 
   useEffect(() => {
-    if (!session) {
+    if (!myAccountNumber) {
       setAccount(null);
       return undefined;
     }
@@ -36,7 +37,7 @@ function AppNavigator() {
     setError('');
 
     // API連携ポイント: 画面表示時と送金完了後に最新残高をDBから再取得する。
-    getMySummary()
+    getUserSummary(myAccountNumber)
       .then((data) => {
         if (active) setAccount(data);
       })
@@ -50,7 +51,7 @@ function AppNavigator() {
     return () => {
       active = false;
     };
-  }, [reloadCount, session]);
+  }, [reloadCount, myAccountNumber]);
 
   if (initializing) {
     return <p className="screen-message">ログイン状態を確認しています...</p>;
@@ -64,6 +65,7 @@ function AppNavigator() {
     return (
       <ProcessPayment
         invoiceNumber={invoiceMatch.params.invoiceNumber}
+        myAccountNumber={myAccountNumber}
         onSwitchAccount={signOut}
       />
     );
@@ -72,6 +74,7 @@ function AppNavigator() {
   if (currentScreen === 'recipients') {
     return (
       <SelectSendMoney
+        accountNumber={myAccountNumber}
         onBack={() => setCurrentScreen('profile')}
         onSelectRecipient={(recipient) => {
           setSelectedRecipient(recipient);
@@ -84,6 +87,7 @@ function AppNavigator() {
   if (currentScreen === 'transfer' && selectedRecipient) {
     return (
       <ProcessSendMoney
+        senderAccountNumber={myAccountNumber}
         recipientAccountNumber={selectedRecipient.account_number}
         accountBalance={account?.account_balance || 0}
         onBack={() => setCurrentScreen('recipients')}
@@ -101,7 +105,7 @@ function AppNavigator() {
       <MakeInvoiceLink
         onBack={() => setCurrentScreen('profile')}
         onCreate={async ({ amount, message }) => {
-          const result = await createInvoice(amount, message || '');
+          const result = await createInvoice(myAccountNumber, amount, message || '');
           setInvoiceLink(result.invoice_link);
           setCurrentScreen('copyInvoiceLink');
         }}
@@ -128,6 +132,7 @@ function AppNavigator() {
     return (
       <InvoiceStatusScreen
         account={account}
+        accountNumber={myAccountNumber}
         onBack={() => setCurrentScreen('profile')}
         onSwitchAccount={signOut}
       />
