@@ -5,8 +5,6 @@ import NavigationButton from '../components/NavigationButton';
 function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceStatus,}) {
   const buttonWidth = '80vw';
   const buttonHeight = '7vh';
-  const buttonColor = '#316745';
-  const buttonHoverColor = '#9ca3af';
   const buttonTextColor = '#ffffff';
 
   const userName = account?.user_name || '読み込み中';
@@ -40,8 +38,6 @@ function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceS
         <NavigationButton
           width={buttonWidth}
           height={buttonHeight}
-          backgroundColor={buttonColor}
-          hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
           disabled={loading || !account}
           onClick={onSelectRecipient}
@@ -52,8 +48,6 @@ function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceS
         <NavigationButton
           width={buttonWidth}
           height={buttonHeight}
-          backgroundColor={buttonColor}
-          hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
           onClick={onInvoice}
         >
@@ -63,8 +57,6 @@ function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceS
         <NavigationButton
           width={buttonWidth}
           height={buttonHeight}
-          backgroundColor={buttonColor}
-          hoverColor={buttonHoverColor}
           textColor={buttonTextColor}
           onClick={onInvoiceStatus}
         >

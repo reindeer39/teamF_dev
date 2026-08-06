@@ -16,7 +16,6 @@
 .make-invoice-link__submit {
   position: absolute;
   left: 50%;
-  width: var(--app-content-width);
   transform: translate(-50%, -50%);
 }
 
@@ -29,48 +28,9 @@
   width: min(70vw, 420px);
 }
 
-.make-invoice-link__amount > span,
-.make-invoice-link__message > span {
-  display: block;
-  margin-bottom: 8px;
-  color: #333333;
-  font-size: 16px;
-}
-
-.make-invoice-link__amount-box {
-  display: flex;
-  align-items: center;
-  border: 1px solid #999999;
-  border-radius: var(--app-control-radius);
-  background-color: var(--app-surface-color);
-}
-
-.make-invoice-link__amount-box input {
-  width: 100%;
-  height: 52px;
-  box-sizing: border-box;
-  padding: 0 12px;
-  border: 0;
-  outline: none;
-  background: transparent;
-  font-size: 18px;
-  text-align: right;
-  appearance: textfield;
-}
-
-.make-invoice-link__amount-box input::-webkit-inner-spin-button,
-.make-invoice-link__amount-box input::-webkit-outer-spin-button {
-  margin: 0;
-  -webkit-appearance: none;
-}
-
-.make-invoice-link__amount-box span {
-  padding-right: 14px;
-  color: #333333;
-}
-
 .make-invoice-link__submit {
   top: min(90vh, 760px);
+  width: var(--app-content-width);
 }
 
 .make-invoice-link__submit .navigation-button {

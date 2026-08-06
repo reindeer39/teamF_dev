@@ -4,6 +4,7 @@ import { createTransfer, getRecipientInfo } from '../api/users';
 import './ProcessSendMoney.css';
 import NavigationButton from '../components/NavigationButton';
 import MessageInput from '../components/MessageInput';
+import AmountInput from '../components/AmountInput';
 
 function ProcessSendMoney({
   senderAccountNumber,
@@ -104,21 +105,12 @@ function ProcessSendMoney({
       </section>
 
       <section className="amount-section">
-        <label className="section-label" htmlFor="send-amount">送金金額</label>
-        <div className="amount-input-wrapper">
-          <input
-            id="send-amount"
-            className="amount-input"
-            type="number"
-            min="1"
-            step="1"
-            inputMode="numeric"
-            placeholder="金額"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-          <span className="yen-label">円</span>
-        </div>
+        <AmountInput
+          id="send-amount"
+          label="送金金額"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
       </section>
 
       <section className="message-section">
@@ -136,8 +128,6 @@ function ProcessSendMoney({
       <NavigationButton
         width="100%"
         height="10vh"
-        backgroundColor="#e76f75"
-        hoverColor="#d75d64"
         disabled={!canSubmit}
         onClick={handleSubmit}
       >

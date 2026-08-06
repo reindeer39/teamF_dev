@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import NavigationButton from '../components/NavigationButton';
 import MessageInput from '../components/MessageInput';
+import AmountInput from '../components/AmountInput';
 import './MakeInvoiceLink.css';
 
 function MakeInvoiceLink({ onCreate = () => {} }) {
@@ -22,23 +23,13 @@ function MakeInvoiceLink({ onCreate = () => {} }) {
 
   return (
     <form className="make-invoice-link" onSubmit={handleSubmit}>
-      <label className="make-invoice-link__amount" htmlFor="invoice-amount">
-        <span>請求金額</span>
-        <div className="make-invoice-link__amount-box">
-          <input
-            id="invoice-amount"
-            aria-label="請求金額"
-            type="number"
-            min="1"
-            step="1"
-            inputMode="numeric"
-            placeholder="1,000"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-          <span>円</span>
-        </div>
-      </label>
+      <AmountInput
+        id="invoice-amount"
+        className="make-invoice-link__amount"
+        label="請求金額"
+        value={amount}
+        onChange={(event) => setAmount(event.target.value)}
+      />
 
       <MessageInput
         id="invoice-message"

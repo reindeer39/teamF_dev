@@ -175,8 +175,6 @@ function ProcessPayment({
         <NavigationButton
           width="100%"
           height="54px"
-          backgroundColor="#e76f75"
-          hoverColor="#d75d64"
           onClick={handleReturnTop}
         >
           トップへ戻る
@@ -269,8 +267,6 @@ function ProcessPayment({
       <NavigationButton
         width="100%"
         height="54px"
-        backgroundColor="#e76f75"
-        hoverColor="#d75d64"
         disabled={!canPay}
         onClick={handlePayment}
       >
