@@ -42,6 +42,14 @@ teamF_dev/
 
 ## セットアップ
 
+最初に、公開用の安全な設定をコピーします。
+
+```bash
+cp .env.example .env
+```
+
+ルートの`.env`にある`REACT_APP_DATA_MODE`は、Reactのアイコン表示とDjangoのモックデータ選択で共通して使用されます。通常開発では`public`を使用します。
+
 ### フロントエンド (React)
 
 ```bash
@@ -98,7 +106,8 @@ python manage.py runserver
 - 送金履歴モデル・テーブル: `Transaction` / `transactions`
 - 請求モデル・テーブル: `Invoice` / `invoices`
 - モデルのマイグレーション: `backend/api/migrations/0001_initial.py`
-- 共有用モックデータ: `backend/api/mock_data/mock_data.json`
+- 公開用モックデータ: `backend/api/mock_data/public/mock_data.json`
+- デモ用モックデータ: `backend/api/mock_data/private/mock_data.json`（Git管理外）
 - モックデータ投入コマンド: `python manage.py seed_mock_data`
 - JSON対象データの安全な再作成: `python manage.py seed_mock_data --reset`
 - Account、Transaction、InvoiceのDjango管理画面
@@ -115,14 +124,56 @@ SQLite本体の`backend/db.sqlite3`は、開発者ごとにローカルで作成
 代わりに、次の2種類のファイルをGitで共有します。
 
 - テーブル構造: `backend/api/models.py`と`backend/api/migrations/`
-- 共通で使用するデータ: `backend/api/mock_data/mock_data.json`
+- 共通で使用する公開データ: `backend/api/mock_data/public/mock_data.json`
 
 各開発者がマイグレーションとモックデータ投入コマンドを実行することで、それぞれの`db.sqlite3`に同じテーブルと同じデータを作成できます。
 
 ```text
 models.py + migrations（テーブル構造） ─┐
                                          ├─ 各開発者がコマンドを実行 → 各自のdb.sqlite3
-mock_data.json（共有するレコード） ─────┘
+public/mock_data.json（共有するレコード） ─┘
+```
+
+### public・privateモードとUSBデモ
+
+プロジェクトルートの`.env`で、フロントエンドとバックエンドのデータモードをまとめて切り替えます。
+
+```env
+# GitHubで共有する架空名とデフォルトアイコン
+REACT_APP_DATA_MODE=public
+
+# USBで配布する本名データとメンバー画像
+REACT_APP_DATA_MODE=private
+```
+
+privateモードのデモでは、USBから次の2か所へファイルをコピーします。
+
+```text
+public/private-avatars/                 # avatar-01.pngなどのメンバー画像
+backend/api/mock_data/private/mock_data.json
+```
+
+その後、ルートの`.env`を次の内容にして起動します。
+
+```env
+REACT_APP_DATA_MODE=private
+```
+
+```bash
+cd backend
+python manage.py seed_mock_data --reset
+python manage.py runserver
+```
+
+別のターミナルでプロジェクトルートから`npm start`を実行してください。`.env`を変更した場合はReact開発サーバーの再起動が必要です。`.env`、privateモックデータ、メンバー画像はいずれもGit管理外です。
+
+> **公開用ビルドの注意:** Create React Appはmodeに関係なく`public/`配下を`build/`へコピーします。公開用に`npm run build`する前は、`public/private-avatars/`からメンバー画像を取り除いてください。private画像が入ったbuild成果物は公開・共有しないでください。
+
+一時的にモックデータだけを明示して投入する場合は、`.env`より`--mode`が優先されます。
+
+```bash
+python manage.py seed_mock_data --mode public
+python manage.py seed_mock_data --mode private
 ```
 
 ### 初めて環境を作る開発者
@@ -167,7 +218,7 @@ python manage.py seed_mock_data
 共通データを追加・変更する担当者は、以下のファイルを編集します。
 
 ```text
-backend/api/mock_data/mock_data.json
+backend/api/mock_data/public/mock_data.json
 ```
 
 JSONはDjango fixture固有の形式ではなく、`accounts`、`transactions`、`invoices`を持つ通常のJSONです。主な記載ルールは次のとおりです。
@@ -198,7 +249,7 @@ python manage.py test api
 
 ```bash
 cd ..
-git add backend/api/mock_data/mock_data.json
+git add backend/api/mock_data/public/mock_data.json
 git commit -m "feat: モックデータを更新"
 git push
 ```
@@ -310,7 +361,7 @@ JSONの内容どおりに対象モックデータを作り直す場合は、次�
 python manage.py seed_mock_data --reset
 ```
 
-モックデータの編集場所は`backend/api/mock_data/mock_data.json`です。`backend/db.sqlite3`は各開発者のローカルファイルであり、Gitでは共有・コミットしません。テーブル構造はマイグレーション、共同開発用データはこのJSONで共有します。
+公開用モックデータの編集場所は`backend/api/mock_data/public/mock_data.json`です。`backend/db.sqlite3`は各開発者のローカルファイルであり、Gitでは共有・コミットしません。テーブル構造はマイグレーション、共同開発用データはpublic側のJSONで共有します。
 
 ## React・API・データベース連携
 
@@ -461,7 +512,9 @@ npm run build
 ### データベース・共有データ
 
 - `backend/db.sqlite3` は各開発者のローカルデータベースなのでGitへコミットしない
-- `backend/api/mock_data/mock_data.json` はチームで共有するためGitへコミットする
+- `backend/api/mock_data/public/mock_data.json` はチームで共有するためGitへコミットする
+- `backend/api/mock_data/private/` と `public/private-avatars/` はGitへコミットしない
+- `.env.example` はpublic設定として共有し、`.env`はGitへコミットしない
 - `models.py` を変更した場合は、生成したマイグレーションファイルもコミットする
 - pull後に新しいマイグレーションがある場合は、`python manage.py migrate` を実行する
 - `mock_data.json` が更新された場合は、`python manage.py seed_mock_data` を実行する

@@ -5,6 +5,7 @@ APIが利用するAccount、Transaction、Invoiceを、fixture形式ではない
 """
 
 import json
+import os
 import uuid
 from pathlib import Path
 
@@ -28,18 +29,58 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--mode",
+            choices=("public", "private"),
+            default=None,
+            help=(
+                "投入するモックデータを選択します。省略時はプロジェクトルートの"
+                ".envにあるREACT_APP_DATA_MODEを使用します。"
+            ),
+        )
+        parser.add_argument(
             "--reset",
             action="store_true",
             help="JSONに記載されたデータだけを削除してから再登録します。",
         )
 
-    def get_mock_data_path(self):
-        return Path(settings.BASE_DIR) / "api" / "mock_data" / "mock_data.json"
+    def get_mock_data_path(self, mode):
+        return (
+            Path(settings.BASE_DIR)
+            / "api"
+            / "mock_data"
+            / mode
+            / "mock_data.json"
+        )
+
+    def get_data_mode(self, command_mode):
+        """コマンド引数、環境変数、ルート.env、publicの順でモードを決める。"""
+        if command_mode:
+            return command_mode
+
+        mode = os.environ.get("REACT_APP_DATA_MODE")
+        env_path = Path(settings.BASE_DIR).parent / ".env"
+        if mode is None and env_path.exists():
+            for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                if key.strip() == "REACT_APP_DATA_MODE":
+                    mode = value.strip().strip("'\"")
+                    break
+
+        mode = mode or "public"
+        if mode not in {"public", "private"}:
+            raise CommandError(
+                "REACT_APP_DATA_MODEはpublicまたはprivateにしてください。"
+            )
+        return mode
 
     def handle(self, *args, **options):
-        # DBへ書き込む前にJSON全体を検証し、不正データの途中登録を防ぐ。
-        data = self._load_and_validate(self.get_mock_data_path())
-
+        mode = self.get_data_mode(options["mode"])
+        data = self._load_and_validate(
+            self.get_mock_data_path(mode)
+        )
         account_created = 0
         account_updated = 0
         transaction_created = 0
