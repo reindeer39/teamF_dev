@@ -4,19 +4,183 @@
 `Account.objects...`などがDjango ORMによるDB操作、`Response(...)`が
 Reactへ返すJSONレスポンスです。詳しい流れはBACKEND_FLOW_GUIDE.mdを参照。
 """
-from django.db import transaction
-from rest_framework.views import APIView
+from django.contrib.auth import authenticate, get_user_model
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.views import APIView
 
-from api.models import Account, Transaction
+from api.models import Account, Invoice, Transaction
+from api.serializers import SignupSerializer
+
+
+User = get_user_model()
+
+
+def account_data(account):
+    """Reactで共通利用する口座情報を同じJSON形式へ変換する。"""
+    return {
+        "account_number": account.account_number,
+        "user_icon": account.user_icon,
+        "user_name": account.user_name,
+        "account_balance": account.account_balance,
+    }
+
+
+def authenticated_account_data(account):
+    """認証API向けにAccount情報と認証Userのメールアドレスを返す。"""
+    return {
+        **account_data(account),
+        "mail_address": account.auth_user.email if account.auth_user else "",
+    }
+
+
+def authenticated_account(request):
+    """認証ユーザーに紐づくAccountを取得する。"""
+    try:
+        return request.user.bank_account
+    except Account.DoesNotExist:
+        return None
+
+
+class SignupView(APIView):
+    """認証ユーザーと送金口座を同時に作成する。"""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = SignupSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=validated_data["mail_address"],
+                    email=validated_data["mail_address"],
+                    password=validated_data["password"],
+                    is_active=True,
+                    is_staff=False,
+                    is_superuser=False,
+                )
+                account = Account.objects.create(
+                    account_number=validated_data["account_number"],
+                    user_name=validated_data["user_name"],
+                    user_icon="",
+                    account_balance=0,
+                    auth_user=user,
+                )
+                token = Token.objects.create(user=user)
+        except IntegrityError:
+            duplicate_errors = {}
+            if Account.objects.filter(pk=validated_data["account_number"]).exists():
+                duplicate_errors["account_number"] = [
+                    "この口座番号は既に使用されています。"
+                ]
+            if User.objects.filter(email__iexact=validated_data["mail_address"]).exists():
+                duplicate_errors["mail_address"] = [
+                    "このメールアドレスは既に使用されています。"
+                ]
+            if duplicate_errors:
+                return Response(
+                    duplicate_errors,
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response(
+                {"error": "アカウントを作成できませんでした。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "token": token.key,
+                "mail_address": user.email,
+                "account": authenticated_account_data(account),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class LoginView(APIView):
+    """メールアドレスとパスワードを検証して永続トークンを返す。"""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        raw_mail_address = request.data.get("mail_address", "")
+        email = raw_mail_address.strip().lower() if isinstance(raw_mail_address, str) else ""
+        password = request.data.get("password", "")
+        user_by_email = (
+            User.objects.filter(email__iexact=email).first() if email else None
+        )
+        authentication_name = user_by_email.username if user_by_email else email
+        user = authenticate(
+            request=request,
+            username=authentication_name,
+            password=password,
+        )
+        if user is None:
+            return Response(
+                {"error": "メールアドレスまたはパスワードが正しくありません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            account = user.bank_account
+        except Account.DoesNotExist:
+            return Response(
+                {"error": "メールアドレスまたはパスワードが正しくありません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response(
+            {
+                "token": token.key,
+                "mail_address": user.email,
+                "account": authenticated_account_data(account),
+            }
+        )
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Token.objects.filter(user=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CurrentUserView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        account = authenticated_account(request)
+        if account is None:
+            return Response(
+                {"error": "ログインユーザーに口座が紐づいていません。"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        data = authenticated_account_data(account)
+        return Response({**data, "account": account_data(account)})
 
 
 class UserSummaryView(APIView):
     """
     Step 1: ユーザ口座情報取得
     GET /api/user/{account_number}/summary
+
+    ログインさえしていれば、送金先や請求元など任意の口座の公開情報
+    （アイコン・名前・残高）を取得できる。自分の口座に限定しないのは、
+    請求支払い画面で請求元のプロフィールを取得する用途でも使うため。
     """
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, account_number: str):
         try:
             # API連携ポイント: Reactトップ画面へAccountの現在値を返す。
@@ -40,7 +204,15 @@ class RecipientListView(APIView):
     Step 3: 送金先一覧の取得
     GET /api/user/{account_number}/recipient_list
     """
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, account_number: str):
+        login_account = authenticated_account(request)
+        if login_account is None or login_account.pk != account_number:
+            return Response(
+                {"error": "この口座へアクセスする権限がありません。"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         # API連携ポイント: React送金先一覧へ送金元以外のAccountを返す。
         # 最初に送金元自体が存在するか確認し、誤ったURLなら404にする。
         if not Account.objects.filter(account_number=account_number).exists():
@@ -65,7 +237,15 @@ class RecipientInfoView(APIView):
     Step 4: 送金処理画面情報取得
     GET /api/user/{sender_account_number}/{recipient_account_number}/recipient
     """
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, sender_account_number: str, recipient_account_number: str):
+        login_account = authenticated_account(request)
+        if login_account is None or login_account.pk != sender_account_number:
+            return Response(
+                {"error": "この口座へアクセスする権限がありません。"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         try:
             # API連携ポイント: React送金画面へ送金元残高と送金先情報を返す。
             # DB操作: 送金元と送金先をそれぞれaccountsから取得する。
@@ -89,7 +269,15 @@ class TransferView(APIView):
     Step 5・6: 送金処理, メッセージ
     POST /api/user/{sender_account_number}/{recipient_account_number}/transfer
     """
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, sender_account_number: str, recipient_account_number: str):
+        login_account = authenticated_account(request)
+        if login_account is None or login_account.pk != sender_account_number:
+            return Response(
+                {"error": "この口座から送金する権限がありません。"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         # ReactがPOSTしたJSONは、DRFによりrequest.dataへ変換される。
         transfer_amount = request.data.get("transfer_amount")
         message = request.data.get("message", "")
@@ -155,3 +343,246 @@ class TransferView(APIView):
         except Account.DoesNotExist:
             # 送金元または送金先が存在しない場合。atomic内の変更は取り消される。
             return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class InvoiceRequestView(APIView):
+    """
+    Step 7: 請求のリクエスト
+    POST /api/user/{account_number}/invoice_request
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, account_number: str):
+        login_account = authenticated_account(request)
+        if login_account is None or login_account.pk != account_number:
+            return Response(
+                {"error": "この口座から請求リクエストを作成する権限がありません。"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        invoice_amount = request.data.get("invoice_amount")
+        message = request.data.get("message", "")
+
+        if invoice_amount is None:
+            return Response(
+                {"error": "Not enough parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if type(invoice_amount) is not int or invoice_amount < 1:
+            return Response(
+                {"error": "invoice_amount must be an integer greater than or equal to 1"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if message is None:
+            message = ""
+        if not isinstance(message, str) or len(message) > 200:
+            return Response(
+                {"error": "message must be a string of 200 characters or fewer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            account = Account.objects.get(account_number=account_number)
+            invoice = Invoice(
+                invoice_amount=invoice_amount,
+                message=message,
+                account_number=account,
+            )
+            invoice.full_clean()
+            invoice.save()
+
+            invoice_link = (
+                f"{settings.FRONTEND_BASE_URL.rstrip('/')}"
+                f"/invoice/{invoice.invoice_number}"
+            )
+            return Response({"invoice_link": invoice_link}, status=status.HTTP_200_OK)
+        except Account.DoesNotExist:
+            return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+        except ValidationError as exc:
+            return Response(
+                {"error": exc.message_dict}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class InvoiceInfoView(APIView):
+    """
+    Step 8-1: 請求情報の取得
+    GET /api/{invoice_number}/get_inf
+    """
+    def get(self, request, invoice_number: str):
+        try:
+            invoice = Invoice.objects.get(invoice_number=invoice_number)
+        except (Invoice.DoesNotExist, ValidationError, ValueError):
+            return Response(
+                {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response(
+            {
+                "invoice_account_number": invoice.account_number_id,
+                "invoice_amount": str(invoice.invoice_amount),
+                "invoice_message": invoice.message,
+                "invoice_flag": invoice.invoice_flag,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class InvoicePayView(APIView):
+    """
+    Step 8-2: 請求の支払い用API
+    POST /api/{invoice_number}/pay
+    """
+    def post(self, request, invoice_number: str):
+        my_account_number = request.data.get("my_account_number")
+        invoice_account_number = request.data.get("invoice_account_number")
+        invoice_amount = request.data.get("invoice_amount")
+        message = request.data.get("message", "")
+
+        if not my_account_number or not invoice_account_number or invoice_amount is None:
+            return Response(
+                {"error": "Not enough parameters"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if message is None:
+            message = ""
+        if not isinstance(message, str) or len(message) > 200:
+            return Response(
+                {"error": "message must be a string of 200 characters or fewer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if type(invoice_amount) is int:
+            requested_amount = invoice_amount
+        elif isinstance(invoice_amount, str) and invoice_amount.isdigit():
+            requested_amount = int(invoice_amount)
+        else:
+            return Response(
+                {"error": "invoice_amount must be an integer"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if requested_amount < 1:
+            return Response(
+                {"error": "invoice_amount must be greater than or equal to 1"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            with transaction.atomic():
+                invoice = (
+                    Invoice.objects.select_for_update()
+                    .select_related("account_number")
+                    .get(invoice_number=invoice_number)
+                )
+                if invoice.invoice_flag == Invoice.InvoiceFlag.PAID:
+                    return Response(
+                        {"error": "Invoice already paid"},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                if invoice.account_number_id != str(invoice_account_number):
+                    return Response(
+                        {"error": "Invoice account does not match"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if invoice.invoice_amount != requested_amount:
+                    return Response(
+                        {"error": "Invoice amount does not match"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if str(my_account_number) == invoice.account_number_id:
+                    return Response(
+                        {"error": "Payer and invoice account must be different"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                payer = Account.objects.select_for_update().get(
+                    account_number=my_account_number
+                )
+                payee = Account.objects.select_for_update().get(
+                    account_number=invoice.account_number_id
+                )
+                if payer.account_balance < invoice.invoice_amount:
+                    return Response(
+                        {"error": "Insufficient account balance"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                payer.account_balance -= invoice.invoice_amount
+                payee.account_balance += invoice.invoice_amount
+                payer.save(update_fields=["account_balance"])
+                payee.save(update_fields=["account_balance"])
+
+                transfer = Transaction.objects.create(
+                    sender=payer,
+                    recipient=payee,
+                    transfer_amount=invoice.invoice_amount,
+                    message=message,
+                )
+
+                invoice.invoice_flag = Invoice.InvoiceFlag.PAID
+                invoice.paid_time = transfer.created_at
+                invoice.paid_by = payer
+                invoice.transaction_number = transfer
+                invoice.full_clean()
+                invoice.save(
+                    update_fields=[
+                        "invoice_flag",
+                        "paid_time",
+                        "paid_by",
+                        "transaction_number",
+                    ]
+                )
+
+            # 仕様上はレスポンスボディなしだが、Reactの完了画面表示に
+            # 取引番号・金額・支払後残高が必要なため付与する。
+            return Response(
+                {
+                    "transaction_number": str(transfer.transaction_number),
+                    "payment_amount": transfer.transfer_amount,
+                    "payer_account_balance": payer.account_balance,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Invoice.DoesNotExist:
+            return Response(
+                {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        except Account.DoesNotExist:
+            return Response({"error": "Account not found"}, status=status.HTTP_404_NOT_FOUND)
+        except (ValidationError, ValueError):
+            return Response(
+                {"error": "Invalid invoice data"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class InvoiceListView(APIView):
+    """
+    Step 9: 請求リストの取得
+    GET /api/user/{account_number}/invoice_list
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, account_number: str):
+        login_account = authenticated_account(request)
+        if login_account is None or login_account.pk != account_number:
+            return Response(
+                {"error": "この口座の請求リストを取得する権限がありません。"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not Account.objects.filter(account_number=account_number).exists():
+            return Response({"error": "not found account"}, status=status.HTTP_404_NOT_FOUND)
+
+        invoices = Invoice.objects.filter(account_number=account_number).order_by(
+            "-created_time"
+        )
+        invoice_list = [
+            {
+                "invoice_time": timezone.localtime(invoice.created_time).strftime(
+                    "%Y-%m-%d %H:%M:%S.%f"
+                ),
+                "invoice_flag": invoice.invoice_flag,
+                "paid_by": invoice.paid_by_id,
+                "invoice_number": str(invoice.invoice_number),
+            }
+            for invoice in invoices
+        ]
+        return Response({"invoice_list": invoice_list}, status=status.HTTP_200_OK)

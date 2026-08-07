@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import recipientIcon from '../images/human2.png';
-import { createTransfer, getRecipientInfo } from '../api/users';
+import { getRecipientInfo } from '../api/accounts';
+import { createTransfer } from '../api/transfers';
 import './ProcessSendMoney.css';
 import NavigationButton from '../components/NavigationButton';
+import MessageInput from '../components/MessageInput';
+import AmountInput from '../components/AmountInput';
+import { resolveUserIcon } from '../userIcons';
 
 function ProcessSendMoney({
   senderAccountNumber,
   recipientAccountNumber,
   accountBalance,
-  onBack,
-  onTransferComplete,
+  onTransferSuccess,
 }) {
   const [recipient, setRecipient] = useState(null);
   const [amount, setAmount] = useState('');
@@ -64,6 +66,7 @@ function ProcessSendMoney({
         message
       );
       setResult(transferResult);
+      onTransferSuccess?.();
     } catch (apiError) {
       setError(`送金できませんでした: ${apiError.message}`);
     } finally {
@@ -74,24 +77,32 @@ function ProcessSendMoney({
   if (result) {
     return (
       <main className="send-money-screen transfer-complete">
-        <h1>送金が完了しました</h1>
-        <p>{result.transfer_amount.toLocaleString('ja-JP')}円を送金しました。</p>
-        <p>取引番号：{result.transaction_number}</p>
-        <button type="button" className="send-button" onClick={onTransferComplete}>
-          トップへ戻る
-        </button>
+        <section className="transfer-complete__card">
+          <span className="transfer-complete__icon" aria-hidden="true">✓</span>
+          <h1>送金が完了しました</h1>
+          <p className="transfer-complete__guide">正常に送金処理が完了しました。</p>
+          <div className="transfer-complete__summary">
+            <span>送金金額</span>
+            <strong>{result.transfer_amount.toLocaleString('ja-JP')}円</strong>
+          </div>
+          <p className="transfer-complete__transaction">
+            取引番号：{result.transaction_number}
+          </p>
+        </section>
       </main>
     );
   }
 
   return (
     <form className="send-money-screen" onSubmit={handleSubmit}>
-      <button type="button" className="text-button" onClick={onBack}>戻る</button>
-
       <section className="recipient-section">
         <p className="section-label">送金先</p>
         <div className="recipient-info">
-          <img className="recipient-icon" src={recipientIcon} alt="送金先のユーザー" />
+          <img
+            className="recipient-icon"
+            src={resolveUserIcon(recipient?.recipient_icon)}
+            alt={`${recipient?.recipient_name || '送金先ユーザー'}のアイコン`}
+          />
           <p className="recipient-name">
             {loading ? '読み込み中...' : recipient?.recipient_name}
           </p>
@@ -104,29 +115,19 @@ function ProcessSendMoney({
       </section>
 
       <section className="amount-section">
-        <label className="section-label" htmlFor="send-amount">送金金額</label>
-        <div className="amount-input-wrapper">
-          <input
-            id="send-amount"
-            className="amount-input"
-            type="number"
-            min="1"
-            step="1"
-            inputMode="numeric"
-            placeholder="金額"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-          <span className="yen-label">円</span>
-        </div>
+        <AmountInput
+          id="send-amount"
+          label="送金金額"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+        />
       </section>
 
       <section className="message-section">
-        <label className="section-label" htmlFor="transfer-message">メッセージ（任意）</label>
-        <textarea
+        <MessageInput
           id="transfer-message"
-          className="message-input"
-          maxLength="200"
+          label="メッセージ（任意）"
+          maxLength={200}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="例：昼食代"
@@ -136,9 +137,7 @@ function ProcessSendMoney({
       {error && <p className="screen-message screen-message--error">{error}</p>}
       <NavigationButton
         width="100%"
-        height="54px"
-        backgroundColor="#e76f75"
-        hoverColor="#d75d64"
+        height="10vh"
         disabled={!canSubmit}
         onClick={handleSubmit}
       >

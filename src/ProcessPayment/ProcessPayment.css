@@ -1,0 +1,158 @@
+.payment-screen {
+  width: var(--app-content-width);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 56px 28px 32px;
+  box-sizing: border-box;
+  background-color: var(--app-background-color);
+  color: #222222;
+}
+
+.payment-screen__back {
+  margin: -8px 0 24px;
+}
+
+.payment-screen__section {
+  margin-bottom: 40px;
+}
+
+.payment-screen__label {
+  margin: 0;
+  color: #555555;
+  font-size: 18px;
+}
+
+.payment-screen__requester {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.payment-screen__icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.payment-screen__name {
+  font-size: 21px;
+}
+
+.payment-screen__detail {
+  display: grid;
+  gap: 30px;
+}
+
+.payment-screen__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.payment-screen__value {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.payment-screen__amount {
+  font-size: 26px;
+}
+
+.payment-screen__message-block {
+  display: grid;
+  gap: 14px;
+}
+
+.payment-screen__warning {
+  margin: -16px 0 20px;
+  color: #b42318;
+  font-size: 14px;
+  text-align: center;
+}
+
+.payment-screen__top-link {
+  display: block;
+  margin: 20px auto 0;
+}
+
+/* 支払い完了画面 */
+.payment-complete {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.payment-complete__title {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.payment-complete__summary {
+  width: 100%;
+  padding: 28px 20px;
+  border: 1px solid #dddddd;
+  border-radius: var(--app-card-radius);
+  box-sizing: border-box;
+  background-color: var(--app-surface-color);
+}
+
+.payment-complete__amount-label {
+  margin: 0 0 12px;
+  color: #555555;
+  font-size: 17px;
+}
+
+.payment-complete__amount {
+  display: block;
+  color: #222222;
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.payment-complete__recipient {
+  margin: 0;
+  font-size: 18px;
+}
+
+.payment-complete__transaction {
+  margin: 0;
+  color: #555555;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 350px) {
+  .payment-screen {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .payment-screen__icon {
+    width: 72px;
+    height: 72px;
+  }
+
+  .payment-screen__requester {
+    gap: 14px;
+  }
+
+  .payment-screen__name,
+  .payment-screen__value {
+    font-size: 19px;
+  }
+
+  .payment-complete__title {
+    font-size: 24px;
+  }
+
+  .payment-complete__amount {
+    font-size: 34px;
+  }
+}

@@ -1,0 +1,38 @@
+.make-invoice-link {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(24px, 5vh, 40px);
+  padding:
+    clamp(24px, 5vh, 48px)
+    0
+    calc(clamp(24px, 5vh, 48px) + 8vh);
+  box-sizing: border-box;
+  background-color: var(--app-background-color);
+}
+
+.make-invoice-link__amount,
+.make-invoice-link__message,
+.make-invoice-link__submit {
+  flex: 0 0 auto;
+}
+
+.make-invoice-link__message {
+  width: min(70vw, 420px);
+}
+
+.make-invoice-link__submit {
+  width: min(80vw, 560px);
+}
+
+.make-invoice-link__submit .navigation-button {
+  width: 100%;
+  height: 54px;
+  padding: 0;
+}
+
+.make-invoice-link__submit .navigation-button:hover {
+  transform: none;
+}

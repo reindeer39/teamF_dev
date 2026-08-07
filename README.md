@@ -21,11 +21,14 @@ teamF_dev/
 │   ├── TopScreen/                 # 画面: プロフィール(トップ)
 │   ├── SelectSendMoney/            # 画面: 送金先一覧
 │   ├── ProcessSendMoney/            # 画面: 送金処理
-│   ├── NextScreen/                  # 画面: 遷移確認用
+│   ├── MakeInvoiceLink/             # 画面: 請求リンク作成
+│   ├── CopyInvoiceLink/             # 画面: 請求リンク表示・コピー
+│   ├── InvoiceStatus/               # 画面: 発行した請求一覧
+│   ├── ProcessPayment/              # 画面: 請求リンクの支払い
 │   ├── components/                   # 共通UIパーツ
-│   ├── api/                           # Django APIを呼ぶ処理
+│   ├── auth/                          # 認証状態とログイン・新規登録画面
+│   ├── api/                           # 共通HTTPクライアントと機能別API
 │   ├── images/
-│   └── account.js                     # 開発用の固定ログイン口座番号
 ├── public/
 ├── package.json
 └── backend/        # バックエンド (Django)
@@ -68,9 +71,19 @@ python manage.py runserver
 
 `http://localhost:8000` で起動します。React 開発サーバー(`localhost:3000`)からのアクセスは CORS 許可済みです。
 
+モックデータ投入後は、次の開発用アカウントですぐにログインできます。
+
+| メールアドレス | パスワード | 口座番号 |
+|---|---|---|
+| `yamada@example.com` | `teamf-dev-pass` | `1000001` |
+| `sato@example.com` | `teamf-dev-pass` | `1000002` |
+| `suzuki@example.com` | `teamf-dev-pass` | `1000003` |
+
+これらはローカル開発専用です。本番環境では使用しないでください。ログイントークンはブラウザのlocalStorageへ保存されるため、ページを再読み込みしてもログイン状態が復元されます。
+
 ## 仕様書
 
-- [バックエンド連携ガイド](backend/BACKEND_FLOW_GUIDE.md) — ReactからAPI、Django ORM、SQLite、レスポンスまでの初心者向け解説
+- [React・API・DB連携ガイド](backend/BACKEND_FLOW_GUIDE.md) — ログイン、画面表示、送金を実コードに沿って追う解説
 - [API仕様書](backend/API_DOCUMENTATION.md) — エンドポイント一覧、リクエスト/レスポンス形式
 - [データベース仕様書](backend/DATABASE_DOCUMENTATION.md) — テーブル定義、制約、ER概要
 
@@ -83,14 +96,15 @@ python manage.py runserver
 - SQLiteデータベース: `backend/db.sqlite3`
 - 口座モデル・テーブル: `Account` / `accounts`
 - 送金履歴モデル・テーブル: `Transaction` / `transactions`
+- 請求モデル・テーブル: `Invoice` / `invoices`
 - モデルのマイグレーション: `backend/api/migrations/0001_initial.py`
 - 共有用モックデータ: `backend/api/mock_data/mock_data.json`
 - モックデータ投入コマンド: `python manage.py seed_mock_data`
 - JSON対象データの安全な再作成: `python manage.py seed_mock_data --reset`
-- AccountとTransactionのDjango管理画面
+- Account、Transaction、InvoiceのDjango管理画面
 - モデル、制約、モックデータ投入処理のテスト
 
-`Account`には口座番号、ユーザーアイコン、ユーザー名、預金残高を保存します。`Transaction`には取引番号、送金元口座、送金先口座、送金金額、メッセージ、送金日時を保存します。
+`Account`には口座番号、ユーザーアイコン、ユーザー名、預金残高を保存します。`Transaction`には取引番号、送金元口座、送金先口座、送金金額、メッセージ、送金日時を保存します。`Invoice`には請求リンクで使うUUID形式の請求番号、請求元・支払口座、請求金額、メッセージ、支払状態・日時、対応するTransactionを保存します。
 
 データベース制約により、残高は0以上、送金金額は1以上、送金元と送金先は別口座である必要があります。また、取引から参照されている口座は誤って削除されないように保護されています。
 
@@ -156,7 +170,7 @@ python manage.py seed_mock_data
 backend/api/mock_data/mock_data.json
 ```
 
-JSONはDjango fixture固有の形式ではなく、`accounts`と`transactions`を持つ通常のJSONです。主な記載ルールは次のとおりです。
+JSONはDjango fixture固有の形式ではなく、`accounts`、`transactions`、`invoices`を持つ通常のJSONです。主な記載ルールは次のとおりです。
 
 - `account_number`は文字列として記載する
 - `transaction_number`はUUID形式の文字列として記載する
@@ -165,6 +179,10 @@ JSONはDjango fixture固有の形式ではなく、`accounts`と`transactions`�
 - `sender_account_number`と`recipient_account_number`には存在する口座番号を記載する
 - 送金元と送金先に同じ口座を指定しない
 - 同じ口座番号または取引番号をJSON内で重複させない
+- `invoice_number`はUUID形式の文字列、`invoice_amount`は1以上の整数にする
+- `invoice_flag`は未払いの`notpay`または支払済みの`paid`にする
+- 未払いでは`paid_time`、`paid_by`、`transaction_number`をすべて`null`にする
+- 支払済みでは上記3項目をすべて設定し、請求元と支払口座を別口座にする
 - JSONにはコメントを書かない。補足説明はREADMEへ記載する
 
 編集した担当者は、コミット前に以下を実行して内容を確認してください。
@@ -202,12 +220,13 @@ python manage.py seed_mock_data
 python manage.py seed_mock_data
 ```
 
-Accountを先に登録し、その後Transactionを登録します。口座番号と取引番号を識別キーとしているため、実行結果は次のようになります。
+Account、Transaction、Invoiceの順に登録します。口座番号、取引番号、請求番号を識別キーとしているため、実行結果は次のようになります。
 
 - 初回実行: JSONのデータを新規登録
 - 2回目以降: 同じキーのデータを更新し、レコードは重複しない
 - JSONを変更して再実行: 既存データを新しい内容へ更新
 - 既存Transactionの更新: `created_at`は変更せず、送金元、送金先、金額、メッセージだけを更新
+- 既存Invoiceの更新: `created_time`は変更せず、請求内容と支払状態だけを更新
 
 処理全体はデータベーストランザクションで保護されています。不正なUUID、不足口座、負の残高、0円以下の送金などが見つかった場合は処理を中断し、途中まで登録したデータもすべてロールバックします。
 
@@ -221,10 +240,12 @@ python manage.py seed_mock_data --reset
 
 削除・登録順序は以下です。
 
-1. JSONに取引番号が記載されているTransactionだけを削除
-2. JSONに口座番号が記載されているAccountだけを削除
-3. JSONのAccountを登録
-4. JSONのTransactionを登録
+1. JSONに請求番号が記載されているInvoiceだけを削除
+2. JSONに取引番号が記載されているTransactionだけを削除
+3. JSONに口座番号が記載されているAccountだけを削除
+4. JSONのAccountを登録
+5. JSONのTransactionを登録
+6. JSONのInvoiceを登録
 
 データベース全体のflushや全件削除は行いません。JSONに記載されていない手動追加データは残ります。また、JSON外のTransactionが対象Accountを参照している場合は、安全のため削除せず処理全体をロールバックします。
 
@@ -274,6 +295,23 @@ python manage.py runserver
 
 ブラウザで`http://127.0.0.1:8000/admin/`を開いてください。Accountでは口座番号、ユーザー名、残高を、Transactionでは取引番号、送金元、送金先、送金金額、メッセージ、送金日時を確認できます。
 
+### 請求用モックデータを各開発者のSQLiteへ反映する
+
+```bash
+cd backend
+source venv/bin/activate
+python manage.py migrate
+python manage.py seed_mock_data
+```
+
+JSONの内容どおりに対象モックデータを作り直す場合は、次を実行します。
+
+```bash
+python manage.py seed_mock_data --reset
+```
+
+モックデータの編集場所は`backend/api/mock_data/mock_data.json`です。`backend/db.sqlite3`は各開発者のローカルファイルであり、Gitでは共有・コミットしません。テーブル構造はマイグレーション、共同開発用データはこのJSONで共有します。
+
 ## React・API・データベース連携
 
 ### 画面操作とAPIの対応
@@ -282,29 +320,41 @@ python manage.py runserver
 
 | Reactの操作 | API | データベース処理 |
 |---|---|---|
-| トップ画面を表示 | `GET /api/user/{account_number}/summary` | `accounts`からユーザー名・口座番号・残高を取得 |
-| 「送金する」を押す | `GET /api/user/{account_number}/recipient_list` | 送金元以外のAccountを取得 |
-| 送金先を選択 | `GET /api/user/{sender}/{recipient}/recipient` | 送金元残高と送金先情報を取得 |
-| 金額・メッセージを入力して「送金」を押す | `POST /api/user/{sender}/{recipient}/transfer` | 送金元残高を減算、送金先残高を加算、Transactionを作成 |
-| 送金完了後にトップへ戻る | `GET /api/user/{account_number}/summary` | 更新後の口座残高を再取得 |
+| 新規登録 | `POST /api/make_account` | 7桁の口座番号・表示名・メール・パスワードからDjango UserとAccountを同時作成 |
+| ログイン | `POST /api/login` | 認証トークンと口座情報を取得 |
+| ログイン状態を復元 | `GET /api/auth/me/` | トークンに紐づく自分のUserとAccountを取得 |
+| トップ画面を表示 | `GET /api/user/{account_number}/summary` | ログイン中の口座を`accounts`から取得 |
+| 「送金する」を押す | `GET /api/user/{account_number}/recipient_list` | ログイン口座以外のAccountを取得 |
+| 送金先を選択 | `GET /api/user/{sender}/{recipient}/recipient` | 送金先と送金可能残高を取得 |
+| 金額・メッセージを入力して「送金」を押す | `POST /api/user/{sender}/{recipient}/transfer` | ログイン口座を送金元として残高更新とTransaction作成 |
+| 「請求する」でリンクを作成 | `POST /api/user/{account_number}/invoice_request` | ログイン口座を請求元としてInvoice作成 |
+| 請求状態を確認 | `GET /api/user/{account_number}/invoice_list` | ログイン口座が発行したInvoice一覧を取得 |
+| `/invoice/{invoice_number}`を開く | `GET /api/{invoice_number}/get_inf`（認証不要） | UUIDから請求元・金額・状態を取得 |
+| 「支払う」を押す | `POST /api/{invoice_number}/pay`（認証不要） | 支払口座の残高、Transaction、Invoiceを一括更新 |
+| ログアウト | `POST /api/auth/logout/` | サーバーとブラウザのトークンを削除 |
 
-開発用のログイン口座番号は`src/account.js`の`ACCOUNT_NUMBER`で指定しています。現在は`mock_data.json`に存在する`1000001`を使用しています。ログイン機能を実装した後は、ここをログインユーザーの口座番号へ置き換えてください。
+固定の`src/account.js`は廃止しました。送金元口座はReactの定数ではなく、ログイン時にAPIから受け取った`account.account_number`をAppNavigatorが保持し、各画面のURL/propsへ渡します。`get_inf`・`pay`はURL(`/{invoice_number}`)から請求を特定するため、ログインしていない相手でも開けます。
 
 ### 画面遷移(ルーティング)の構成
 
-`react-router`のようなライブラリは使わず、`src/navigation/AppNavigator.js`が画面遷移をすべて管理する自前の仕組みです。
+通常画面は`src/navigation/AppNavigator.js`のstateで切り替え、共有する請求URLだけは`react-router-dom`で`/invoice/{invoice_number}`へルーティングします。
 
-- `AppNavigator`が`currentScreen`という状態(`'profile' | 'recipients' | 'transfer' | 'billing'`)を持ち、値に応じて表示する画面コンポーネントを切り替える
+- `AppNavigator`が`currentScreen`という状態を持ち、値に応じて通常画面を切り替える
 - 口座情報(`account`)の取得も`AppNavigator`が行い、必要な画面へpropsとして渡す
-- 各画面(`TopScreen` / `SelectSendMoney` / `ProcessSendMoney` / `NextScreen`)は他の画面を直接importせず、`onBack`や`onSelectRecipient`などのコールバックをpropsで受け取り、遷移は`AppNavigator`に委ねる
+- 各画面は`onBack`や`onSelectRecipient`などのコールバックをpropsで受け取り、通常画面の遷移は`AppNavigator`に委ねる
 
 ```text
 index.js
-  └─ AppNavigator（currentScreen・account を管理）
-       ├─ currentScreen === 'profile'    → TopScreen
-       ├─ currentScreen === 'recipients' → SelectSendMoney
-       ├─ currentScreen === 'transfer'   → ProcessSendMoney
-       └─ currentScreen === 'billing'    → NextScreen
+  └─ BrowserRouter
+       └─ AuthProvider（トークン・ログイン状態を管理）
+          └─ AppNavigator
+            ├─ 未ログイン                    → AuthScreen
+            ├─ currentScreen === 'profile'    → TopScreen
+            ├─ currentScreen === 'recipients' → SelectSendMoney
+            ├─ currentScreen === 'transfer'   → ProcessSendMoney
+            ├─ currentScreen === 'invoice'    → MakeInvoiceLink
+            ├─ currentScreen === 'invoiceStatus' → InvoiceStatusScreen
+            └─ /invoice/:invoiceNumber        → ProcessPayment
 ```
 
 画面を追加する場合の手順:
@@ -315,12 +365,19 @@ index.js
 
 ### API連携コードの場所
 
-- `src/api/users.js`: ReactからDjango APIを呼ぶ処理を集約
+- `src/api/client.js`: ベースURL、JSON処理、Authorizationヘッダー、共通エラー処理
+- `src/api/auth.js`: signup(`/make_account`)、login(`/login`)、logout、ログイン状態復元
+- `src/api/accounts.js`: 口座概要(`/user/{account_number}/summary`)、送金先一覧・詳細
+- `src/api/transfers.js`: 送金POST(`/user/{sender}/{recipient}/transfer`)
+- `src/api/invoices.js`: 請求作成・一覧・請求情報取得・支払い
+- `src/auth/AuthContext.js`: トークン保存とアプリ全体の認証状態
+- `src/auth/AuthScreen.js`: ログイン・新規登録フォーム
 - `src/navigation/AppNavigator.js`: 画面遷移の管理と口座情報の取得
 - `src/TopScreen/TopScreen.js`: トップ画面(プロフィール)の表示
 - `src/SelectSendMoney/SelectSendMoney.js`: 送金先一覧の取得
 - `src/ProcessSendMoney/ProcessSendMoney.js`: 送金先情報の取得と送金POST
 - `backend/api/urls.py`: APIのURL定義
+- `backend/api/serializers.py`: 新規登録の4項目と重複・パスワード検証
 - `backend/api/views.py`: Accountの取得、残高更新、Transaction登録
 - `backend/api/tests.py`: APIリクエストからDB更新までの自動テスト
 
@@ -364,8 +421,14 @@ REACT_APP_API_BASE_URL=http://127.0.0.1:8000/api npm start
 Django API単体は次のコマンドで確認できます。
 
 ```bash
-curl http://127.0.0.1:8000/api/user/1000001/summary
-curl http://127.0.0.1:8000/api/user/1000001/recipient_list
+TOKEN=$(curl -s -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"mail_address":"yamada@example.com","password":"teamf-dev-pass"}' \
+  http://127.0.0.1:8000/api/login | python -c \
+  'import json,sys; print(json.load(sys.stdin)["token"])')
+
+curl -H "Authorization: Token $TOKEN" \
+  http://127.0.0.1:8000/api/user/1000001/summary
 ```
 
 送金POSTはDBの残高と履歴を実際に変更します。開発用データであることを確認してから実行してください。
@@ -373,6 +436,7 @@ curl http://127.0.0.1:8000/api/user/1000001/recipient_list
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
+  -H "Authorization: Token $TOKEN" \
   -d '{"transfer_amount":1000,"message":"API確認"}' \
   http://127.0.0.1:8000/api/user/1000001/1000002/transfer
 ```
