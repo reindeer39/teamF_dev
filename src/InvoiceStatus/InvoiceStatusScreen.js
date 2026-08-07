@@ -4,10 +4,6 @@ import { getInvoiceInfo, getMyInvoices } from '../api/invoices';
 import { resolveUserIcon } from '../userIcons';
 import './InvoiceStatusScreen.css';
 
-const USER_ICONS = {
-  'user1.png': human1,
-};
-
 const INVOICE_REQUESTS = [
   {
     invoiced_at: '2026-08-05 12:30:00.000000',
@@ -33,14 +29,6 @@ const INVOICE_DETAILS = {
     invoice_amount: 100000,
   },
 };
-
-function resolveUserIcon(iconPath) {
-  if (!iconPath) return '';
-
-  const normalizedPath = iconPath.replaceAll('\\', '/');
-  const fileName = normalizedPath.split('/').pop();
-  return USER_ICONS[fileName] || normalizedPath;
-}
 
 function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';

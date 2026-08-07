@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { getUserSummary } from '../api/accounts';
 import { getInvoiceInfo, payInvoice } from '../api/invoices';
-import requesterDefaultIcon from '../images/human2.png';
 import NavigationButton from '../components/NavigationButton';
 import { resolveUserIcon } from '../userIcons';
 import './ProcessPayment.css';
@@ -130,7 +129,7 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
         <div className="payment-screen__requester">
           <img
             className="payment-screen__icon"
-            src={resolveUserIcon(issuer?.user_icon, requesterDefaultIcon)}
+            src={resolveUserIcon(issuer?.user_icon)}
             alt={issuer ? `${issuer.user_name}のアイコン` : ''}
           />
           <strong className="payment-screen__name">
