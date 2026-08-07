@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getRecipientList } from '../api/users';
+import { getRecipientList } from '../api/accounts';
 import { resolveUserIcon } from '../userIcons';
 import './SelectSendMoney.css';
 
-function SelectSendMoney({ senderAccountNumber, onSelectRecipient, onBack }) {
+function SelectSendMoney({ accountNumber, onSelectRecipient, onBack }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,7 +12,7 @@ function SelectSendMoney({ senderAccountNumber, onSelectRecipient, onBack }) {
     let active = true;
 
     // API連携ポイント: 送金元以外の口座をDBから取得して一覧表示する。
-    getRecipientList(senderAccountNumber)
+    getRecipientList(accountNumber)
       .then((data) => {
         if (active) setUsers(data.recipient_list);
       })
@@ -26,7 +26,7 @@ function SelectSendMoney({ senderAccountNumber, onSelectRecipient, onBack }) {
     return () => {
       active = false;
     };
-  }, [senderAccountNumber]);
+  }, [accountNumber]);
 
   return (
     <main className="select-send-money">

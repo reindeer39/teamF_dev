@@ -12,16 +12,21 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from api.management.commands.seed_mock_data import Command as SeedCommand
 from api.models import Account, Invoice, Transaction
+
+
+User = get_user_model()
 
 
 class ModelTests(TestCase):
@@ -295,12 +300,18 @@ class SeedMockDataCommandTests(TestCase):
             "accounts": [
                 {
                     "account_number": "3000001",
+                    "login_username": "developer1",
+                    "login_email": "developer1@example.com",
+                    "login_password": "teamf-test-pass",
                     "user_icon": "/icons/a.png",
                     "user_name": "開発一郎",
                     "account_balance": 10000,
                 },
                 {
                     "account_number": "3000002",
+                    "login_username": "developer2",
+                    "login_email": "developer2@example.com",
+                    "login_password": "teamf-test-pass",
                     "user_icon": "/icons/b.png",
                     "user_name": "開発花子",
                     "account_balance": 20000,
@@ -358,6 +369,13 @@ class SeedMockDataCommandTests(TestCase):
         self.assertEqual(Account.objects.count(), 2)
         self.assertEqual(Transaction.objects.count(), 1)
         self.assertEqual(Invoice.objects.count(), 2)
+        self.assertTrue(User.objects.get(username="developer1").check_password(
+            "teamf-test-pass"
+        ))
+        self.assertEqual(
+            User.objects.get(username="developer1").email,
+            "developer1@example.com",
+        )
         self.assertIn("Account：新規2件，更新0件", output)
         self.assertIn("Transaction：新規1件，更新0件", output)
         self.assertIn("Invoice：新規2件，更新0件", output)
@@ -514,8 +532,14 @@ class InvoiceAPITests(APITestCase):
     """請求の作成・取得・支払い・一覧がSQLiteと連携することを確認する。"""
 
     def setUp(self):
+        self.issuer_user = User.objects.create_user(
+            username="invoice-issuer@example.com",
+            email="invoice-issuer@example.com",
+            password="strong-test-pass",
+        )
         self.issuer = Account.objects.create(
             account_number="5000001",
+            auth_user=self.issuer_user,
             user_name="請求元",
             account_balance=1000,
         )
@@ -524,6 +548,10 @@ class InvoiceAPITests(APITestCase):
             user_name="支払元",
             account_balance=10000,
         )
+
+    def _authenticate_as_issuer(self):
+        token = Token.objects.create(user=self.issuer_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
 
     def _create_invoice(self, amount=3000, message="会食代"):
         return Invoice.objects.create(
@@ -542,7 +570,30 @@ class InvoiceAPITests(APITestCase):
         data.update(overrides)
         return data
 
+    def test_invoice_request_requires_authentication(self):
+        response = self.client.post(
+            "/api/user/5000001/invoice_request",
+            {"invoice_amount": 2500, "message": "夕食代"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_invoice_request_rejects_other_account(self):
+        self._authenticate_as_issuer()
+
+        response = self.client.post(
+            "/api/user/5000002/invoice_request",
+            {"invoice_amount": 2500, "message": "夕食代"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Invoice.objects.count(), 0)
+
     def test_invoice_request_creates_database_record_and_link(self):
+        self._authenticate_as_issuer()
+
         response = self.client.post(
             "/api/user/5000001/invoice_request",
             {"invoice_amount": 2500, "message": "夕食代"},
@@ -562,6 +613,8 @@ class InvoiceAPITests(APITestCase):
         )
 
     def test_invoice_request_rejects_invalid_amount(self):
+        self._authenticate_as_issuer()
+
         for amount in (0, -1, "3000"):
             with self.subTest(amount=amount):
                 response = self.client.post(
@@ -693,12 +746,25 @@ class InvoiceAPITests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Transaction.objects.count(), 0)
 
+    def test_invoice_list_requires_authentication(self):
+        response = self.client.get("/api/user/5000001/invoice_list")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_invoice_list_rejects_other_account(self):
+        self._authenticate_as_issuer()
+
+        response = self.client.get("/api/user/5000002/invoice_list")
+
+        self.assertEqual(response.status_code, 403)
+
     def test_invoice_list_reads_database_in_newest_first_order(self):
         older = self._create_invoice(message="古い請求")
         newer = self._create_invoice(message="新しい請求")
         Invoice.objects.filter(pk=older.pk).update(
             created_time=timezone.now() - timedelta(days=1)
         )
+        self._authenticate_as_issuer()
 
         response = self.client.get("/api/user/5000001/invoice_list")
 
@@ -712,12 +778,286 @@ class InvoiceAPITests(APITestCase):
             r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$",
         )
 
+class AuthenticationAPITests(APITestCase):
+    """新規登録、ログイン保持用トークン、認証済み口座APIを確認する。"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="login-user",
+            email="login@example.com",
+            password="strong-test-pass",
+        )
+        self.account = Account.objects.create(
+            account_number="4100001",
+            auth_user=self.user,
+            user_name="ログイン利用者",
+            account_balance=10000,
+        )
+        self.recipient = Account.objects.create(
+            account_number="4100002",
+            user_name="送金先",
+            account_balance=1000,
+        )
+
+    def _authenticate(self):
+        token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return token
+
+    def signup_data(self, **overrides):
+        data = {
+            "account_number": "4200001",
+            "user_name": "新規利用者",
+            "mail_address": "new-user@example.com",
+            "password": "Correct-Horse-57!",
+        }
+        data.update(overrides)
+        return data
+
+    def test_signup_creates_user_account_and_token(self):
+        response = self.client.post(
+            "/api/make_account",
+            self.signup_data(),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        created_user = User.objects.get(email="new-user@example.com")
+        self.assertTrue(created_user.check_password("Correct-Horse-57!"))
+        self.assertEqual(created_user.bank_account.user_name, "新規利用者")
+        self.assertEqual(created_user.bank_account.account_balance, 0)
+        self.assertEqual(created_user.bank_account.account_number, "4200001")
+        self.assertEqual(response.data["token"], created_user.auth_token.key)
+        self.assertEqual(response.data["mail_address"], "new-user@example.com")
+        self.assertNotIn("password", response.data)
+        self.assertNotIn("password", response.data["account"])
+
+    def test_signup_creates_general_user_permissions(self):
+        self.client.post("/api/make_account", self.signup_data(), format="json")
+
+        created_user = User.objects.get(email="new-user@example.com")
+        self.assertTrue(created_user.is_active)
+        self.assertFalse(created_user.is_staff)
+        self.assertFalse(created_user.is_superuser)
+
+    def test_signup_links_user_and_account_one_to_one(self):
+        self.client.post("/api/make_account", self.signup_data(), format="json")
+
+        created_user = User.objects.get(email="new-user@example.com")
+        account = Account.objects.get(account_number="4200001")
+        self.assertEqual(account.auth_user, created_user)
+        self.assertEqual(created_user.bank_account, account)
+
+    def test_signup_saves_normalized_values_in_separate_models(self):
+        self.client.post(
+            "/api/make_account",
+            self.signup_data(
+                account_number=" 0123456 ",
+                user_name=" 新規利用者 ",
+                mail_address=" NEW-USER@Example.COM ",
+            ),
+            format="json",
+        )
+
+        created_user = User.objects.get(email="new-user@example.com")
+        account = Account.objects.get(pk="0123456")
+        self.assertEqual(created_user.username, "new-user@example.com")
+        self.assertEqual(account.account_number, "0123456")
+        self.assertEqual(account.user_name, "新規利用者")
+        self.assertEqual(account.user_icon, "")
+        self.assertEqual(account.account_balance, 0)
+
+    def test_signup_hashes_password_and_account_has_no_password_field(self):
+        plain_password = "Correct-Horse-57!"
+        self.client.post(
+            "/api/make_account",
+            self.signup_data(password=plain_password),
+            format="json",
+        )
+
+        created_user = User.objects.get(email="new-user@example.com")
+        self.assertNotEqual(created_user.password, plain_password)
+        self.assertTrue(created_user.check_password(plain_password))
+        self.assertNotIn("password", [field.name for field in Account._meta.fields])
+
+    def test_signup_rejects_duplicate_email_without_creating_account(self):
+        response = self.client.post(
+            "/api/make_account",
+            self.signup_data(mail_address="LOGIN@example.com"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["mail_address"],
+            ["このメールアドレスは既に使用されています。"],
+        )
+        self.assertEqual(Account.objects.count(), 2)
+
+    def test_signup_rejects_duplicate_account_number(self):
+        response = self.client.post(
+            "/api/make_account",
+            self.signup_data(account_number="4100001"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["account_number"],
+            ["この口座番号は既に使用されています。"],
+        )
+        self.assertFalse(User.objects.filter(email="new-user@example.com").exists())
+
+    def test_signup_rejects_invalid_account_number(self):
+        response = self.client.post(
+            "/api/make_account",
+            self.signup_data(account_number="0012A45"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("account_number", response.data)
+
+    def test_signup_rejects_invalid_email(self):
+        response = self.client.post(
+            "/api/make_account",
+            self.signup_data(mail_address="not-an-email"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("mail_address", response.data)
+
+    def test_signup_rejects_weak_password(self):
+        response = self.client.post(
+            "/api/make_account",
+            self.signup_data(password="12345678"),
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password", response.data)
+        self.assertFalse(User.objects.filter(email="new-user@example.com").exists())
+
+    @patch("api.views.Account.objects.create", side_effect=IntegrityError("failure"))
+    def test_signup_rolls_back_user_if_account_creation_fails(self, _mock_create):
+        response = self.client.post(
+            "/api/make_account", self.signup_data(), format="json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(email="new-user@example.com").exists())
+
+    def test_login_returns_token_and_account(self):
+        response = self.client.post(
+            "/api/login",
+            {"mail_address": "LOGIN@example.com", "password": "strong-test-pass"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["account"]["account_number"], "4100001")
+        self.assertEqual(response.data["mail_address"], "login@example.com")
+        self.assertTrue(Token.objects.filter(key=response.data["token"]).exists())
+
+    def test_login_failure_does_not_reveal_invalid_field(self):
+        wrong_password_response = self.client.post(
+            "/api/login",
+            {"mail_address": "login@example.com", "password": "wrong-password"},
+            format="json",
+        )
+        unknown_email_response = self.client.post(
+            "/api/login",
+            {"mail_address": "unknown@example.com", "password": "strong-test-pass"},
+            format="json",
+        )
+
+        self.assertEqual(wrong_password_response.status_code, 400)
+        self.assertEqual(unknown_email_response.status_code, 400)
+        self.assertEqual(wrong_password_response.data, unknown_email_response.data)
+        self.assertEqual(
+            wrong_password_response.data["error"],
+            "メールアドレスまたはパスワードが正しくありません。",
+        )
+        self.assertEqual(Token.objects.count(), 0)
+
+    def test_login_without_linked_account_uses_same_generic_error(self):
+        User.objects.create_user(
+            username="no-account",
+            email="no-account@example.com",
+            password="strong-test-pass",
+        )
+
+        response = self.client.post(
+            "/api/login",
+            {"mail_address": "no-account@example.com", "password": "strong-test-pass"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["error"],
+            "メールアドレスまたはパスワードが正しくありません。",
+        )
+
+    def test_current_user_requires_authentication(self):
+        response = self.client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_current_user_returns_linked_account(self):
+        self._authenticate()
+
+        response = self.client.get("/api/auth/me/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["mail_address"], "login@example.com")
+        self.assertEqual(response.data["account_number"], "4100001")
+        self.assertEqual(response.data["account"]["account_number"], "4100001")
+        self.assertNotIn("password", response.data)
+
+    def test_general_user_cannot_access_django_admin(self):
+        self.client.force_authenticate(user=None)
+        self.client.force_login(self.user)
+
+        response = self.client.get("/admin/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response.url)
+
+    def test_logout_invalidates_token(self):
+        token = self._authenticate()
+
+        response = self.client.post("/api/auth/logout/")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
+
+    def test_authenticated_transfer_uses_logged_in_account_as_sender(self):
+        self._authenticate()
+
+        response = self.client.post(
+            "/api/user/4100001/4100002/transfer",
+            {"transfer_amount": 750, "message": "認証送金"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        transfer = Transaction.objects.get()
+        self.assertEqual(transfer.sender, self.account)
+        self.assertEqual(transfer.recipient, self.recipient)
+        self.account.refresh_from_db()
+        self.assertEqual(self.account.account_balance, 9250)
 
 class TransferAPITests(APITestCase):
     """HTTPリクエスト→View→ORM→テストDB→レスポンスの全経路を確認する。"""
     def setUp(self):
+        self.user = User.objects.create_user(
+            username="transfer-user", password="strong-test-pass"
+        )
         self.sender = Account.objects.create(
             account_number="4000001",
+            auth_user=self.user,
             user_icon="/icons/sender.png",
             user_name="API送金者",
             account_balance=10000,
@@ -728,6 +1068,8 @@ class TransferAPITests(APITestCase):
             user_name="API受取人",
             account_balance=2000,
         )
+        token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
 
     def test_summary_api_reads_account_from_database(self):
         response = self.client.get("/api/user/4000001/summary")
@@ -814,4 +1156,14 @@ class TransferAPITests(APITestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_transfer_api_rejects_spoofed_sender(self):
+        response = self.client.post(
+            "/api/user/4000002/4000001/transfer",
+            {"transfer_amount": 100},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
         self.assertEqual(Transaction.objects.count(), 0)

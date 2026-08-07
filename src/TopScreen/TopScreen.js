@@ -2,7 +2,15 @@ import './TopScreen.css';
 import NavigationButton from '../components/NavigationButton';
 import { resolveUserIcon } from '../userIcons';
 
-function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceStatus,}) {
+function TopScreen({
+  account,
+  loading,
+  error,
+  onSelectRecipient,
+  onInvoice,
+  onInvoiceStatus,
+  onLogout,
+}) {
   const buttonWidth = '80vw';
   const buttonHeight = '7vh';
   const buttonColor = '#316745';
@@ -36,6 +44,9 @@ function TopScreen({account,loading,error,onSelectRecipient,onInvoice,onInvoiceS
           <span className="user-profile__balance-label">口座残高</span>
           <strong className="user-profile__balance-value">{accountBalance}</strong>
         </div>
+        <button type="button" className="top-screen__logout" onClick={onLogout}>
+          ログアウト
+        </button>
       </header>
 
       {error && <p className="screen-message screen-message--error">{error}</p>}

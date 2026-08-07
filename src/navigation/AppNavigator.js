@@ -1,38 +1,43 @@
 import { useEffect, useState } from 'react';
-import { useRoutes } from 'react-router';
+import { useMatch, useNavigate } from 'react-router-dom';
 import TopScreen from '../TopScreen/TopScreen';
 import SelectSendMoney from '../SelectSendMoney/SelectSendMoney';
 import ProcessSendMoney from '../ProcessSendMoney/ProcessSendMoney';
+import AuthScreen from '../auth/AuthScreen';
+import { useAuth } from '../auth/AuthContext';
+import { getUserSummary } from '../api/accounts';
 import ProcessPayment from '../ProcessPayment/ProcessPayment';
 import MakeInvoiceLink from '../MakeInvoiceLink/MakeInvoiceLink';
 import CopyInvoiceLink from '../CopyInvoiceLink/CopyInvoiceLink';
 import InvoiceStatusScreen from '../InvoiceStatus/InvoiceStatusScreen';
-import { ACCOUNT_NUMBER } from '../account';
-import { getUserSummary } from '../api/users';
+import { createInvoice } from '../api/invoices';
 
 function AppNavigator() {
+  const { session, initializing, login, signup, signOut } = useAuth();
+  const navigate = useNavigate();
   const [currentScreen, setCurrentScreen] = useState('profile');
-  const [account, setAccount] = useState(null);
+  const [account, setAccount] = useState(session?.account || null);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
   const [invoiceLink, setInvoiceLink] = useState('');
 
-  const invoiceScreen = useRoutes([
-    {
-      path: '/invoice/:invoiceNumber',
-      element: <ProcessPayment requesterName="山田 太郎" billingAmount={3000} message="ランチ代をお願いします" />,
-    },
-  ]);
+  const invoiceMatch = useMatch('/invoice/:invoiceNumber');
+  const myAccountNumber = session?.account?.account_number;
 
   useEffect(() => {
+    if (!myAccountNumber) {
+      setAccount(null);
+      return undefined;
+    }
+
     let active = true;
     setLoading(true);
     setError('');
 
     // API連携ポイント: 画面表示時と送金完了後に最新残高をDBから再取得する。
-    getUserSummary(ACCOUNT_NUMBER)
+    getUserSummary(myAccountNumber)
       .then((data) => {
         if (active) setAccount(data);
       })
@@ -46,16 +51,30 @@ function AppNavigator() {
     return () => {
       active = false;
     };
-  }, [reloadCount]);
+  }, [reloadCount, myAccountNumber]);
 
-  if (invoiceScreen) {
-    return invoiceScreen;
+  if (initializing) {
+    return <p className="screen-message">ログイン状態を確認しています...</p>;
+  }
+
+  if (!session) {
+    return <AuthScreen onLogin={login} onSignup={signup} />;
+  }
+
+  if (invoiceMatch) {
+    return (
+      <ProcessPayment
+        invoiceNumber={invoiceMatch.params.invoiceNumber}
+        myAccountNumber={myAccountNumber}
+        onSwitchAccount={signOut}
+      />
+    );
   }
 
   if (currentScreen === 'recipients') {
     return (
       <SelectSendMoney
-        senderAccountNumber={ACCOUNT_NUMBER}
+        accountNumber={myAccountNumber}
         onBack={() => setCurrentScreen('profile')}
         onSelectRecipient={(recipient) => {
           setSelectedRecipient(recipient);
@@ -68,7 +87,7 @@ function AppNavigator() {
   if (currentScreen === 'transfer' && selectedRecipient) {
     return (
       <ProcessSendMoney
-        senderAccountNumber={ACCOUNT_NUMBER}
+        senderAccountNumber={myAccountNumber}
         recipientAccountNumber={selectedRecipient.account_number}
         accountBalance={account?.account_balance || 0}
         onBack={() => setCurrentScreen('recipients')}
@@ -85,10 +104,9 @@ function AppNavigator() {
     return (
       <MakeInvoiceLink
         onBack={() => setCurrentScreen('profile')}
-        onCreate={({ amount, message }) => {
-          const query = new URLSearchParams({ amount: String(amount) });
-          if (message) query.set('message', message);
-          setInvoiceLink(`${window.location.origin}/invoice?${query.toString()}`);
+        onCreate={async ({ amount, message }) => {
+          const result = await createInvoice(myAccountNumber, amount, message || '');
+          setInvoiceLink(result.invoice_link);
           setCurrentScreen('copyInvoiceLink');
         }}
       />
@@ -100,6 +118,12 @@ function AppNavigator() {
       <CopyInvoiceLink
         invoiceLink={invoiceLink}
         onBack={() => setCurrentScreen('profile')}
+        onOpenAsAnotherAccount={async () => {
+          const invoicePath = new URL(invoiceLink, window.location.origin).pathname;
+          setCurrentScreen('profile');
+          await signOut();
+          navigate(invoicePath);
+        }}
       />
     );
   }
@@ -107,7 +131,10 @@ function AppNavigator() {
   if (currentScreen === 'invoiceStatus') {
     return (
       <InvoiceStatusScreen
+        account={account}
+        accountNumber={myAccountNumber}
         onBack={() => setCurrentScreen('profile')}
+        onSwitchAccount={signOut}
       />
     );
   }
@@ -120,6 +147,7 @@ function AppNavigator() {
       onSelectRecipient={() => setCurrentScreen('recipients')}
       onInvoice={() => setCurrentScreen('invoice')}
       onInvoiceStatus={() => setCurrentScreen('invoiceStatus')}
+      onLogout={signOut}
     />
   );
 }
