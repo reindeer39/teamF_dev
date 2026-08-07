@@ -26,6 +26,24 @@
       "user_icon": "avatar-03.png",
       "user_name": "鈴木一郎",
       "account_balance": 30000
+    },
+    {
+      "account_number": "1000003",
+      "login_username": "suzuki",
+      "login_email": "suzuki@example.com",
+      "login_password": "teamf-dev-pass",
+      "user_icon": "avatar-04.png",
+      "user_name": "佐藤四郎",
+      "account_balance": 30000
+    },
+    {
+      "account_number": "1000003",
+      "login_username": "suzuki",
+      "login_email": "suzuki@example.com",
+      "login_password": "teamf-dev-pass",
+      "user_icon": "avatar-05.png",
+      "user_name": "田中五郎",
+      "account_balance": 30000
     }
   ],
   "transactions": [
