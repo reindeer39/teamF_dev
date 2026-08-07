@@ -5,6 +5,7 @@ import './CopyInvoiceLink.css';
 function CopyInvoiceLink({
   invoiceLink = '',
   onBack = () => {},
+  onOpenAsAnotherAccount,
 }) {
   const [copyMessage, setCopyMessage] = useState('');
 
@@ -29,6 +30,12 @@ function CopyInvoiceLink({
           リンクをコピー
         </button>
         <p aria-live="polite">{copyMessage}</p>
+        <p>支払う人は、請求元とは別のアカウントでこのリンクを開いてください。</p>
+        {onOpenAsAnotherAccount && (
+          <button type="button" onClick={onOpenAsAnotherAccount} disabled={!invoiceLink}>
+            別のアカウントで支払いを確認
+          </button>
+        )}
       </div>
 
       <div className="copy-invoice-link__top-button">

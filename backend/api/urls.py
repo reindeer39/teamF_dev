@@ -7,17 +7,29 @@ config/urls.pyが`/api/`を取り除いた残りのURLをこのファイルへ�
 from django.urls import path
 
 from api.views import (
+    CurrentUserView,
     InvoiceInfoView,
     InvoiceListView,
     InvoicePayView,
     InvoiceRequestView,
+    LoginView,
+    LogoutView,
     RecipientInfoView,
     RecipientListView,
+    SignupView,
     TransferView,
     UserSummaryView,
 )
 
 urlpatterns = [
+    # Step 10: 会員登録・ログイン。
+    path("make_account", SignupView.as_view(), name="signup"),
+    path("login", LoginView.as_view(), name="login"),
+    # 仕様にはないが、ログイン状態の保持に必要な補助エンドポイント。
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
+    path("auth/logout", LogoutView.as_view(), name="logout-legacy"),
+    path("auth/me/", CurrentUserView.as_view(), name="current-user"),
+    path("auth/me", CurrentUserView.as_view(), name="current-user-legacy"),
     # GET /api/user/1000001/summary → UserSummaryView.get(..., "1000001")
     path(
         "user/<str:account_number>/summary",

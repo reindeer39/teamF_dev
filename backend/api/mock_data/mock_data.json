@@ -2,18 +2,27 @@
   "accounts": [
     {
       "account_number": "1000001",
+      "login_username": "yamada",
+      "login_email": "yamada@example.com",
+      "login_password": "teamf-dev-pass",
       "user_icon": "/icons/user1.png",
       "user_name": "山田太郎",
       "account_balance": 97000
     },
     {
       "account_number": "1000002",
+      "login_username": "sato",
+      "login_email": "sato@example.com",
+      "login_password": "teamf-dev-pass",
       "user_icon": "/icons/user2.png",
       "user_name": "佐藤花子",
       "account_balance": 53000
     },
     {
       "account_number": "1000003",
+      "login_username": "suzuki",
+      "login_email": "suzuki@example.com",
+      "login_password": "teamf-dev-pass",
       "user_icon": "/icons/user3.png",
       "user_name": "鈴木一郎",
       "account_balance": 30000
