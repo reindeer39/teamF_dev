@@ -6,8 +6,8 @@
   box-sizing: border-box;
   padding: 25px;
   border: none;
-  border-radius: 8px;
-  background-color: var(--button-background-color, #316745);
+  border-radius: var(--app-control-radius);
+  background-color: var(--button-background-color, var(--app-primary-color));
   color: var(--button-text-color, #ffffff);
   font-size: 1rem;
   cursor: pointer;
@@ -15,14 +15,14 @@
 }
 
 .navigation-button:hover {
-  background-color: var(--button-hover-color, #66706a);
+  background-color: var(--button-hover-color, var(--app-primary-hover-color));
   box-shadow: 0 4px 10px rgb(0 0 0 / 20%);
   transform: translateY(-2px);
 }
 
 .navigation-button:disabled,
 .navigation-button:disabled:hover {
-  background-color: #b8b8b8;
+  background-color: var(--app-disabled-color);
   box-shadow: none;
   cursor: not-allowed;
   transform: none;

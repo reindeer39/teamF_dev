@@ -3,7 +3,7 @@ import { getRecipientList } from '../api/accounts';
 import userIcon from '../images/human1.png';
 import './SelectSendMoney.css';
 
-function SelectSendMoney({ accountNumber, onSelectRecipient, onBack }) {
+function SelectSendMoney({ accountNumber, onSelectRecipient }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -30,11 +30,6 @@ function SelectSendMoney({ accountNumber, onSelectRecipient, onBack }) {
 
   return (
     <main className="select-send-money">
-      <div className="select-send-money__header">
-        <button type="button" className="text-button" onClick={onBack}>戻る</button>
-        <h1 className="select-send-money__title">送金先一覧</h1>
-      </div>
-
       {loading && <p className="screen-message">読み込み中...</p>}
       {error && <p className="screen-message screen-message--error">{error}</p>}
 

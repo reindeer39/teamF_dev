@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import MessageInput from '../components/MessageInput';
 import { getUserSummary } from '../api/accounts';
 import { getInvoiceInfo, getMyInvoices } from '../api/invoices';
 import { resolveUserIcon } from '../utils/resolveUserIcon';
@@ -9,7 +10,7 @@ function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
 }
 
-function InvoiceStatusScreen({ account, accountNumber, onBack, onSwitchAccount }) {
+function InvoiceStatusScreen({ account, accountNumber, onSwitchAccount }) {
   const [invoices, setInvoices] = useState([]);
   const [openInvoiceNumber, setOpenInvoiceNumber] = useState(null);
   const [details, setDetails] = useState({});
@@ -87,18 +88,6 @@ function InvoiceStatusScreen({ account, accountNumber, onBack, onSwitchAccount }
   return (
     <main className="invoice-status-screen">
       <section className="invoice-status-panel">
-        <header className="invoice-status-header">
-          <button
-            className="invoice-back-button"
-            type="button"
-            aria-label="前の画面に戻る"
-            onClick={onBack}
-          >
-            &lt;
-          </button>
-          <h1 className="invoice-status-title">お願いした請求</h1>
-        </header>
-
         <div className="invoice-status-owner">
           <p>
             請求元：<strong>{account?.user_name || 'ログイン中のアカウント'}</strong>
@@ -198,10 +187,13 @@ function InvoiceStatusScreen({ account, accountNumber, onBack, onSwitchAccount }
                             </button>
                           )}
                         </div>
-                        <label className="invoice-message-label">
-                          メッセージ
-                          <textarea value={detail.message || ''} readOnly />
-                        </label>
+                        <MessageInput
+                          id={`invoice-message-${invoice.invoice_number}`}
+                          className="invoice-message-input"
+                          label="メッセージ"
+                          value={detail.message || ''}
+                          readOnly
+                        />
                       </>
                     )}
                   </div>

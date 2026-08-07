@@ -1,15 +1,15 @@
 .payment-screen {
-  width: 85vw;
+  width: var(--app-content-width);
   min-height: 100dvh;
   margin: 0 auto;
   padding: 56px 28px 32px;
   box-sizing: border-box;
-  background-color: #f8f8f8;
+  background-color: var(--app-background-color);
   color: #222222;
 }
 
 .payment-screen__back {
-  margin: -8px 0 24px -12px;
+  margin: -8px 0 24px;
 }
 
 .payment-screen__section {
@@ -68,20 +68,6 @@
   gap: 14px;
 }
 
-.payment-screen__message {
-  min-height: 64px;
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px solid #dddddd;
-  border-radius: 12px;
-  box-sizing: border-box;
-  background-color: #ffffff;
-  font-size: 17px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .payment-screen__warning {
   margin: -16px 0 20px;
   color: #b42318;
@@ -112,9 +98,9 @@
   width: 100%;
   padding: 28px 20px;
   border: 1px solid #dddddd;
-  border-radius: 16px;
+  border-radius: var(--app-card-radius);
   box-sizing: border-box;
-  background-color: #ffffff;
+  background-color: var(--app-surface-color);
 }
 
 .payment-complete__amount-label {

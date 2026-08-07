@@ -5,6 +5,7 @@ import { getUserSummary } from '../api/accounts';
 import { getInvoiceInfo, payInvoice } from '../api/invoices';
 import requesterDefaultIcon from '../images/human2.png';
 import NavigationButton from '../components/NavigationButton';
+import MessageInput from '../components/MessageInput';
 import { resolveUserIcon } from '../utils/resolveUserIcon';
 import './ProcessPayment.css';
 
@@ -113,10 +114,17 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
         <p className="payment-complete__recipient">
           {issuer.user_name}さんへ支払いました。
         </p>
-        <p className="payment-complete__transaction">
-          取引番号：{result.transaction_number}
-        </p>
-        <NavigationButton onClick={() => navigate('/')}>
+        {result.transaction_number && (
+          <p className="payment-complete__transaction">
+            取引番号：{result.transaction_number}
+          </p>
+        )}
+
+        <NavigationButton
+          width="100%"
+          height="54px"
+          onClick={() => navigate('/')}
+        >
           トップへ戻る
         </NavigationButton>
       </main>
@@ -125,8 +133,16 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
 
   return (
     <main className="payment-screen">
-      <section className="payment-screen__section" aria-labelledby="requester-label">
-        <p id="requester-label" className="payment-screen__label">請求元</p>
+      <section
+        className="payment-screen__section"
+        aria-labelledby="requester-label"
+      >
+        <p
+          id="requester-label"
+          className="payment-screen__label"
+        >
+          請求元
+        </p>
         <div className="payment-screen__requester">
           <img
             className="payment-screen__icon"
@@ -152,12 +168,13 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
             {formatYen(invoiceAmount)}
           </p>
         </div>
-        <div className="payment-screen__message-block">
-          <p className="payment-screen__label">メッセージ</p>
-          <p className="payment-screen__message">
-            {invoiceInfo?.invoice_message || 'メッセージはありません'}
-          </p>
-        </div>
+        <MessageInput
+          id="payment-message"
+          className="payment-screen__message-block"
+          label="メッセージ"
+          value={invoiceInfo?.invoice_message || 'メッセージはありません'}
+          readOnly
+        />
       </section>
 
       {error && <p className="payment-screen__warning" role="alert">{error}</p>}
@@ -175,7 +192,12 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
         </p>
       )}
 
-      <NavigationButton disabled={!canPay} onClick={handlePayment}>
+      <NavigationButton
+        width="100%"
+        height="54px"
+        disabled={!canPay}
+        onClick={handlePayment}
+      >
         {loading ? '読み込み中...' : submitting ? '支払い中...' : '支払う'}
       </NavigationButton>
       {onSwitchAccount && (

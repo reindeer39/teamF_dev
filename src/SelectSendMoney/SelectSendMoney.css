@@ -1,9 +1,10 @@
 .select-send-money {
-  width: min(85vw, 720px);
+  width: var(--app-content-width);
   min-height: 100vh;
   margin: 0 auto;
   padding: 32px 0;
   box-sizing: border-box;
+  background-color: var(--app-background-color);
 }
 
 .select-send-money__header {
@@ -21,12 +22,10 @@
 .select-send-money__list {
   margin: 0;
   padding: 0;
-  /* border-top: 1px solid #dddddd; */
+  border: 1px solid #dddddd;
+  border-radius: var(--app-card-radius);
+  overflow: hidden;
   list-style: none;
-}
-
-.select-send-money__user {
-  /* border-bottom: 1px solid #dddddd; */
 }
 
 .select-send-money__user-button {
@@ -37,7 +36,7 @@
   min-height: 88px;
   padding: 12px 16px;
   border: 0;
-  background: #ffffff;
+  background: var(--app-surface-color);
   color: #222222;
   text-align: left;
   cursor: pointer;

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import NavigationButton from '../components/NavigationButton';
+import MessageInput from '../components/MessageInput';
+import AmountInput from '../components/AmountInput';
 import './MakeInvoiceLink.css';
 
-function MakeInvoiceLink({ onBack = () => {}, onCreate = () => {} }) {
+function MakeInvoiceLink({ onCreate = () => {} }) {
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -31,42 +33,22 @@ function MakeInvoiceLink({ onBack = () => {}, onCreate = () => {} }) {
 
   return (
     <form className="make-invoice-link" onSubmit={handleSubmit}>
-      <button
-        type="button"
-        className="make-invoice-link__back"
-        onClick={onBack}
-      >
-        戻る
-      </button>
+      <AmountInput
+        id="invoice-amount"
+        className="make-invoice-link__amount"
+        label="請求金額"
+        value={amount}
+        onChange={(event) => setAmount(event.target.value)}
+      />
 
-      <label className="make-invoice-link__amount" htmlFor="invoice-amount">
-        <span>請求金額</span>
-        <div className="make-invoice-link__amount-box">
-          <input
-            id="invoice-amount"
-            aria-label="請求金額"
-            type="number"
-            min="1"
-            step="1"
-            inputMode="numeric"
-            placeholder="1,000"
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-          <span>円</span>
-        </div>
-      </label>
-
-      <label className="make-invoice-link__message" htmlFor="invoice-message">
-        <span>メッセージ入力</span>
-        <textarea
-          id="invoice-message"
-          aria-label="メッセージ（任意）"
-          placeholder="ランチ代をお願いします"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-        />
-      </label>
+      <MessageInput
+        id="invoice-message"
+        className="make-invoice-link__message"
+        label="メッセージ（任意）"
+        placeholder="例：ランチ代をお願いします"
+        value={message}
+        onChange={(event) => setMessage(event.target.value)}
+      />
 
       <div className="make-invoice-link__submit">
         {error && <p className="screen-message screen-message--error">{error}</p>}
