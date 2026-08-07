@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getRecipientList } from '../api/accounts';
-import userIcon from '../images/human1.png';
+import { resolveUserIcon } from '../userIcons';
 import './SelectSendMoney.css';
 
 function SelectSendMoney({ accountNumber, onSelectRecipient }) {
@@ -41,7 +41,11 @@ function SelectSendMoney({ accountNumber, onSelectRecipient }) {
               className="select-send-money__user-button"
               onClick={() => onSelectRecipient(user)}
             >
-              <img src={userIcon} className="select-send-money__icon" alt="" />
+              <img
+                src={resolveUserIcon(user.user_icon)}
+                className="select-send-money__icon"
+                alt={`${user.user_name}のアイコン`}
+              />
               <span className="select-send-money__user-details">
                 <strong>{user.user_name}</strong>
                 <span>口座番号：{user.account_number}</span>

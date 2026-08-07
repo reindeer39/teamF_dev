@@ -5,7 +5,7 @@
       "login_username": "yamada",
       "login_email": "yamada@example.com",
       "login_password": "teamf-dev-pass",
-      "user_icon": "/icons/user1.png",
+      "user_icon": "avatar-01.png",
       "user_name": "山田太郎",
       "account_balance": 97000
     },
@@ -14,7 +14,7 @@
       "login_username": "sato",
       "login_email": "sato@example.com",
       "login_password": "teamf-dev-pass",
-      "user_icon": "/icons/user2.png",
+      "user_icon": "avatar-02.png",
       "user_name": "佐藤花子",
       "account_balance": 53000
     },
@@ -23,7 +23,7 @@
       "login_username": "suzuki",
       "login_email": "suzuki@example.com",
       "login_password": "teamf-dev-pass",
-      "user_icon": "/icons/user3.png",
+      "user_icon": "avatar-03.png",
       "user_name": "鈴木一郎",
       "account_balance": 30000
     }
