@@ -166,7 +166,7 @@ function InvoiceStatusScreen({ account, accountNumber, onSwitchAccount }) {
                           </div>
                         )}
                         {!isPaid && (
-                          <p className="invoice-awaiting-payment">支払者からの支払い待ちです。</p>
+                          <p className="invoice-awaiting-payment">支払い待ちです。</p>
                         )}
                         <div
                           className={`invoice-amount-row ${

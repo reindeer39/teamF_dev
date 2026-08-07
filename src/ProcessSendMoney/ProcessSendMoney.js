@@ -117,7 +117,7 @@ function ProcessSendMoney({
       <section className="amount-section">
         <AmountInput
           id="send-amount"
-          label="送金金額"
+          label="送金額"
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
         />
