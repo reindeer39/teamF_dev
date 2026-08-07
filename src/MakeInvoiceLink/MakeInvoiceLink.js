@@ -7,18 +7,28 @@ import './MakeInvoiceLink.css';
 function MakeInvoiceLink({ onCreate = () => {} }) {
   const [amount, setAmount] = useState('');
   const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const numericAmount = Number(amount);
   const canCreate = Number.isInteger(numericAmount) && numericAmount > 0;
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    if (!canCreate) return;
+    if (!canCreate || submitting) return;
 
-    onCreate({
-      amount: numericAmount,
-      message: message.trim() || null,
-    });
+    setSubmitting(true);
+    setError('');
+    try {
+      await onCreate({
+        amount: numericAmount,
+        message: message.trim(),
+      });
+    } catch (apiError) {
+      setError(`請求リンクを作成できませんでした: ${apiError.message}`);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -41,8 +51,9 @@ function MakeInvoiceLink({ onCreate = () => {} }) {
       />
 
       <div className="make-invoice-link__submit">
-        <NavigationButton onClick={handleSubmit} disabled={!canCreate}>
-          リンク作成
+        {error && <p className="screen-message screen-message--error">{error}</p>}
+        <NavigationButton onClick={handleSubmit} disabled={!canCreate || submitting}>
+          {submitting ? '作成中...' : 'リンク作成'}
         </NavigationButton>
       </div>
     </form>

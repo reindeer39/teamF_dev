@@ -3,6 +3,7 @@ import './CopyInvoiceLink.css';
 
 function CopyInvoiceLink({
   invoiceLink = '',
+  onOpenAsAnotherAccount,
 }) {
   const [copyMessage, setCopyMessage] = useState('');
   const [copyStatus, setCopyStatus] = useState('');
@@ -36,6 +37,14 @@ function CopyInvoiceLink({
         >
           {copyMessage}
         </p>
+        <p className="copy-invoice-link__guide">
+          支払う人は、請求元とは別のアカウントでこのリンクを開いてください。
+        </p>
+        {onOpenAsAnotherAccount && (
+          <button type="button" onClick={onOpenAsAnotherAccount} disabled={!invoiceLink}>
+            別のアカウントで支払いを確認
+          </button>
+        )}
       </section>
     </main>
   );

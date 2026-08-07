@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import recipientIcon from '../images/human2.png';
-import { createTransfer, getRecipientInfo } from '../api/users';
+import { getRecipientInfo } from '../api/accounts';
+import { createTransfer } from '../api/transfers';
 import './ProcessSendMoney.css';
 import NavigationButton from '../components/NavigationButton';
 import MessageInput from '../components/MessageInput';
@@ -112,7 +113,7 @@ function ProcessSendMoney({
       <section className="amount-section">
         <AmountInput
           id="send-amount"
-          label="送金額"
+          label="送金金額"
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
         />
