@@ -113,7 +113,7 @@ function InvoiceStatusScreen({ account, accountNumber, onSwitchAccount }) {
   return (
     <main className="invoice-status-screen">
       <section className="invoice-status-panel">
-        <div className="invoice-status-owner">
+        {/* <div className="invoice-status-owner">
           <p>
             請求元：<strong>{account?.user_name || 'ログイン中のアカウント'}</strong>
           </p>
@@ -132,7 +132,7 @@ function InvoiceStatusScreen({ account, accountNumber, onSwitchAccount }) {
               </button>
             )}
           </div>
-        </div>
+        </div> */}
 
         {loading && <p>読み込み中...</p>}
         {error && <p className="invoice-list-message--error">{error}</p>}

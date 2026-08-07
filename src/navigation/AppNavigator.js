@@ -73,7 +73,7 @@ function AppNavigator() {
 
   if (invoiceMatch) {
     return (
-      <AppLayout title="支払い" onBack={() => navigate('/')}>
+      <AppLayout title="支払い" onBack={() => navigate('/')} onLogout={signOut}>
         <ProcessPayment
           invoiceNumber={invoiceMatch.params.invoiceNumber}
           myAccountNumber={myAccountNumber}
@@ -85,7 +85,7 @@ function AppNavigator() {
 
   if (currentScreen === 'recipients') {
     return (
-      <AppLayout title="送金先一覧" onBack={() => setCurrentScreen('profile')}>
+      <AppLayout title="送金先一覧" onBack={() => setCurrentScreen('profile')} onLogout={signOut}>
       <SelectSendMoney
         accountNumber={myAccountNumber}
         onSelectRecipient={(recipient) => {
@@ -102,6 +102,7 @@ function AppNavigator() {
     return (
       <AppLayout
         title={isTransferComplete ? '送金完了' : '送金'}
+        onLogout={signOut}
         onBack={() => {
           if (isTransferComplete) {
             setSelectedRecipient(null);
@@ -126,7 +127,7 @@ function AppNavigator() {
 
   if (currentScreen === 'invoice') {
     return (
-      <AppLayout title="請求" onBack={() => setCurrentScreen('profile')}>
+      <AppLayout title="請求" onBack={() => setCurrentScreen('profile')} onLogout={signOut}>
       <MakeInvoiceLink
         onCreate={async ({ amount, message }) => {
           const result = await createInvoice(myAccountNumber, amount, message || '');
@@ -140,7 +141,7 @@ function AppNavigator() {
 
   if (currentScreen === 'copyInvoiceLink') {
     return (
-      <AppLayout title="請求リンク" onBack={() => setCurrentScreen('profile')}>
+      <AppLayout title="請求リンク" onBack={() => setCurrentScreen('profile')} onLogout={signOut}>
       <CopyInvoiceLink
         invoiceLink={invoiceLink}
         onOpenAsAnotherAccount={async () => {
@@ -156,7 +157,7 @@ function AppNavigator() {
 
   if (currentScreen === 'invoiceStatus') {
     return (
-      <AppLayout title="お願いした請求" onBack={() => setCurrentScreen('profile')}>
+      <AppLayout title="お願いした請求" onBack={() => setCurrentScreen('profile')} onLogout={signOut}>
       <InvoiceStatusScreen
         account={account}
         accountNumber={myAccountNumber}
@@ -167,7 +168,7 @@ function AppNavigator() {
   }
 
   return (
-    <AppLayout title="トップ">
+    <AppLayout title="トップ" onLogout={signOut}>
     <TopScreen
       account={account}
       loading={loading}
@@ -175,7 +176,6 @@ function AppNavigator() {
       onSelectRecipient={() => setCurrentScreen('recipients')}
       onInvoice={() => setCurrentScreen('invoice')}
       onInvoiceStatus={() => setCurrentScreen('invoiceStatus')}
-      onLogout={signOut}
     />
     </AppLayout>
   );

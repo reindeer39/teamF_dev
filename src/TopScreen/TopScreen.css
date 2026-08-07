@@ -75,16 +75,6 @@
   font-size: clamp(1.25rem, 4vmin, 2rem);
 }
 
-.top-screen__logout {
-  align-self: flex-end;
-  padding: 8px 14px;
-  border: 1px solid #9aaca0;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #316745;
-  cursor: pointer;
-}
-
 .navigation-actions {
   display: flex;
   flex-direction: column;

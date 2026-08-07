@@ -3,7 +3,7 @@
   top: 0;
   z-index: 100;
   display: grid;
-  grid-template-columns: clamp(48px, 10vw, 72px) 1fr clamp(48px, 10vw, 72px);
+  grid-template-columns: clamp(72px, 20vw, 120px) 1fr clamp(72px, 20vw, 120px);
   align-items: center;
   width: 100%;
   height: var(--app-top-bar-height);
@@ -28,4 +28,32 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.top-bar__logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(38px, 6vmin, 44px);
+  height: clamp(38px, 6vmin, 44px);
+  padding: 0;
+  border: 2px solid var(--app-primary-color);
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--app-primary-color);
+  cursor: pointer;
+}
+
+.top-bar__logout svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.top-bar__logout:hover {
+  background-color: rgb(49 103 69 / 10%);
 }
