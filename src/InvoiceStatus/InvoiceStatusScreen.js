@@ -5,32 +5,6 @@ import { getInvoiceInfo, getMyInvoices } from '../api/invoices';
 import { resolveUserIcon } from '../userIcons';
 import './InvoiceStatusScreen.css';
 
-const INVOICE_REQUESTS = [
-  {
-    invoiced_at: '2026-08-05 12:30:00.000000',
-    payment_flag: 'pay',
-    payer_account_number: '1000001',
-    invoice_number: 'invoice-001',
-  },
-  {
-    invoiced_at: '2026-07-20 09:15:00.000000',
-    payment_flag: 'notpay',
-    payer_account_number: null,
-    invoice_number: 'invoice-002',
-  },
-];
-
-const INVOICE_DETAILS = {
-  'invoice-001': {
-    message: '8月分の請求です。',
-    invoice_amount: 100000,
-  },
-  'invoice-002': {
-    message: 'hogehogehogehogehoeegehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehogehoge',
-    invoice_amount: 100000,
-  },
-};
-
 function formatInvoiceTime(invoiceTime) {
   return invoiceTime?.replace('T', ' ').slice(0, 16) || '---- -- -- --:--';
 }

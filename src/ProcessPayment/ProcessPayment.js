@@ -16,16 +16,11 @@ function formatYen(value) {
     : '---円';
 }
 
-<<<<<<< HEAD
-function ProcessPayment({ invoiceNumber, myAccountNumber }) {
-=======
 function ProcessPayment({
   invoiceNumber,
   myAccountNumber,
-  onSwitchAccount,
   onPaymentComplete,
 }) {
->>>>>>> 417d5068380b35bdfa4890d6e3bdf8be4bb3d361
   const navigate = useNavigate();
   const [invoiceInfo, setInvoiceInfo] = useState(null);
   const [issuer, setIssuer] = useState(null);

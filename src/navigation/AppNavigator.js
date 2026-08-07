@@ -77,7 +77,6 @@ function AppNavigator() {
         <ProcessPayment
           invoiceNumber={invoiceMatch.params.invoiceNumber}
           myAccountNumber={myAccountNumber}
-          onSwitchAccount={signOut}
           onPaymentComplete={(paymentResult) => {
             if (Number.isFinite(paymentResult?.payer_account_balance)) {
               setAccount((currentAccount) => (
