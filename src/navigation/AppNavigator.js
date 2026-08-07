@@ -101,7 +101,7 @@ function AppNavigator() {
   if (currentScreen === 'transfer' && selectedRecipient) {
     return (
       <AppLayout
-        title={isTransferComplete ? '送金完了' : '送金'}
+        title={isTransferComplete ? '送金完了' : '送金画面'}
         onLogout={signOut}
         onBack={() => {
           if (isTransferComplete) {
@@ -144,12 +144,6 @@ function AppNavigator() {
       <AppLayout title="請求リンク" onBack={() => setCurrentScreen('profile')} onLogout={signOut}>
       <CopyInvoiceLink
         invoiceLink={invoiceLink}
-        onOpenAsAnotherAccount={async () => {
-          const invoicePath = new URL(invoiceLink, window.location.origin).pathname;
-          setCurrentScreen('profile');
-          await signOut();
-          navigate(invoicePath);
-        }}
       />
       </AppLayout>
     );
@@ -157,7 +151,7 @@ function AppNavigator() {
 
   if (currentScreen === 'invoiceStatus') {
     return (
-      <AppLayout title="お願いした請求" onBack={() => setCurrentScreen('profile')} onLogout={signOut}>
+      <AppLayout title="請求リスト" onBack={() => setCurrentScreen('profile')} onLogout={signOut}>
       <InvoiceStatusScreen
         account={account}
         accountNumber={myAccountNumber}

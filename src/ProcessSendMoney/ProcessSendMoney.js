@@ -82,7 +82,7 @@ function ProcessSendMoney({
           <h1>送金が完了しました</h1>
           <p className="transfer-complete__guide">正常に送金処理が完了しました。</p>
           <div className="transfer-complete__summary">
-            <span>送金金額</span>
+            <span>送金額</span>
             <strong>{result.transfer_amount.toLocaleString('ja-JP')}円</strong>
           </div>
           <p className="transfer-complete__transaction">

@@ -16,7 +16,7 @@ function formatYen(value) {
     : '---円';
 }
 
-function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
+function ProcessPayment({ invoiceNumber, myAccountNumber }) {
   const navigate = useNavigate();
   const [invoiceInfo, setInvoiceInfo] = useState(null);
   const [issuer, setIssuer] = useState(null);
@@ -25,7 +25,7 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
-  const [switchingAccount, setSwitchingAccount] = useState(false);
+  // const [switchingAccount, setSwitchingAccount] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -88,6 +88,7 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
     }
   }
 
+  /*
   async function handleSwitchAccount() {
     if (!onSwitchAccount || switchingAccount) return;
     setSwitchingAccount(true);
@@ -99,6 +100,7 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
       setSwitchingAccount(false);
     }
   }
+  */
 
   if (result) {
     return (
@@ -199,6 +201,7 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
       >
         {loading ? '読み込み中...' : submitting ? '支払い中...' : '支払う'}
       </NavigationButton>
+      {/* 別のアカウントでログインするUIは現在使用しない。
       {onSwitchAccount && (
         <button
           type="button"
@@ -208,7 +211,7 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
         >
           {switchingAccount ? 'ログアウト中...' : '別のアカウントでログイン'}
         </button>
-      )}
+      )} */}
       <button
         type="button"
         className="text-button payment-screen__top-link"
