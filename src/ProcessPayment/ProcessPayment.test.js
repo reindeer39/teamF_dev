@@ -24,7 +24,7 @@ beforeEach(() => {
       return Promise.resolve({
         account_number: '1000001',
         user_name: '請求者',
-        user_icon: '/icons/user1.png',
+        user_icon: 'avatar-01.png',
         account_balance: 50000,
       });
     }
@@ -37,6 +37,7 @@ beforeEach(() => {
   payInvoice.mockResolvedValue({
     payment_amount: 2500,
     transaction_number: '11111111-1111-4111-8111-111111111111',
+    payer_account_balance: 7500,
   });
 });
 
@@ -63,7 +64,7 @@ test('URLの請求番号からDBの請求内容とログイン口座残高を表
   expect(screen.getByText('2,500円')).toBeInTheDocument();
   expect(screen.getByText('夕食代')).toBeInTheDocument();
   expect(screen.getByAltText('請求者のアイコン').getAttribute('src')).toContain(
-    'human1'
+    'avatar-01'
   );
   expect(getInvoiceInfo).toHaveBeenCalledWith(invoiceNumber);
   expect(getUserSummary).toHaveBeenCalledWith(myAccountNumber);
@@ -105,4 +106,18 @@ test('支払うボタンで請求支払いAPIを呼び完了結果を表示す�
   );
   expect(await screen.findByText('支払いが完了しました')).toBeInTheDocument();
   expect(screen.getByText(/11111111-1111-4111-8111-111111111111/)).toBeInTheDocument();
+});
+
+test('支払い完了後にトップへ戻ると更新後の残高を通知する', async () => {
+  const onPaymentComplete = jest.fn();
+  renderPayment({ onPaymentComplete });
+
+  const payButton = await screen.findByRole('button', { name: '支払う' });
+  await waitFor(() => expect(payButton).toBeEnabled());
+  fireEvent.click(payButton);
+  fireEvent.click(await screen.findByRole('button', { name: 'トップへ戻る' }));
+
+  expect(onPaymentComplete).toHaveBeenCalledWith(
+    expect.objectContaining({ payer_account_balance: 7500 })
+  );
 });

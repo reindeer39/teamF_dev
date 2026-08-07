@@ -78,6 +78,21 @@ function AppNavigator() {
           invoiceNumber={invoiceMatch.params.invoiceNumber}
           myAccountNumber={myAccountNumber}
           onSwitchAccount={signOut}
+          onPaymentComplete={(paymentResult) => {
+            if (Number.isFinite(paymentResult?.payer_account_balance)) {
+              setAccount((currentAccount) => (
+                currentAccount
+                  ? {
+                      ...currentAccount,
+                      account_balance: paymentResult.payer_account_balance,
+                    }
+                  : currentAccount
+              ));
+            }
+            setCurrentScreen('profile');
+            navigate('/');
+            setReloadCount((count) => count + 1);
+          }}
         />
       </AppLayout>
     );
