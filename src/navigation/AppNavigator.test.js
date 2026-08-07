@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import AppNavigator from './AppNavigator';
 import { getUserSummary, getRecipientInfo, getRecipientList } from '../api/accounts';
 import { createTransfer } from '../api/transfers';
-import { createInvoice, getInvoiceInfo, getMyInvoices } from '../api/invoices';
+import { createInvoice, getInvoiceInfo, getMyInvoices, payInvoice } from '../api/invoices';
 import { useAuth } from '../auth/AuthContext';
 
 jest.mock('../api/accounts');
@@ -13,13 +13,13 @@ jest.mock('../auth/AuthContext');
 
 const summary = {
   account_number: '1000001',
-  user_icon: '/icons/user1.png',
+  user_icon: 'avatar-01.png',
   user_name: '山田太郎',
   account_balance: 97000,
 };
 const otherAccountSummary = {
   account_number: '1000002',
-  user_icon: '/icons/user2.png',
+  user_icon: 'avatar-02.png',
   user_name: '佐藤花子',
   account_balance: 50000,
 };
@@ -41,7 +41,7 @@ beforeEach(() => {
     recipient_list: [
       {
         account_number: '1000002',
-        user_icon: '/icons/user2.png',
+        user_icon: 'avatar-02.png',
         user_name: '佐藤花子',
       },
     ],
@@ -50,7 +50,7 @@ beforeEach(() => {
     sender_account_number: '1000001',
     sender_account_balance: 97000,
     recipient_account_number: '1000002',
-    recipient_icon: '/icons/user2.png',
+    recipient_icon: 'avatar-02.png',
     recipient_name: '佐藤花子',
   });
   createTransfer.mockResolvedValue({
@@ -70,6 +70,11 @@ beforeEach(() => {
     invoice_amount: '2500',
     invoice_message: '夕食代',
     invoice_flag: 'notpay',
+  });
+  payInvoice.mockResolvedValue({
+    payment_amount: 2500,
+    transaction_number: '11111111-1111-4111-8111-111111111111',
+    payer_account_balance: 47500,
   });
 });
 
@@ -183,11 +188,40 @@ test('請求元の確認画面へ支払状態と支払者アイコンを反映�
 
   expect(await screen.findByText('佐藤花子')).toBeInTheDocument();
   expect(screen.getByAltText('佐藤花子のアイコン').getAttribute('src')).toContain(
-    'human2'
+    'avatar-02'
   );
 
   fireEvent.click(screen.getByRole('button', { name: '最新の状態に更新' }));
   await waitFor(() => expect(getMyInvoices).toHaveBeenCalledTimes(2));
+});
+
+test('請求支払い後にトップ画面の残高を更新してDBから再取得する', async () => {
+  let payerSummaryRequests = 0;
+  useAuth.mockReturnValue({
+    session: { email: 'sato@example.com', account: otherAccountSummary },
+    initializing: false,
+    login: jest.fn(),
+    signup: jest.fn(),
+    signOut,
+  });
+  getUserSummary.mockImplementation((accountNumber) => {
+    if (accountNumber === '1000001') return Promise.resolve(summary);
+    payerSummaryRequests += 1;
+    return Promise.resolve({
+      ...otherAccountSummary,
+      account_balance: payerSummaryRequests >= 3 ? 47500 : 50000,
+    });
+  });
+
+  renderNavigator(['/invoice/33333333-3333-4333-8333-333333333333']);
+
+  const payButton = await screen.findByRole('button', { name: '支払う' });
+  await waitFor(() => expect(payButton).toBeEnabled());
+  fireEvent.click(payButton);
+  fireEvent.click(await screen.findByRole('button', { name: 'トップへ戻る' }));
+
+  expect(await screen.findByText('47,500円')).toBeInTheDocument();
+  await waitFor(() => expect(payerSummaryRequests).toBeGreaterThanOrEqual(3));
 });
 
 test('送金ボタンからAPIを呼び出して送金完了まで遷移する', async () => {

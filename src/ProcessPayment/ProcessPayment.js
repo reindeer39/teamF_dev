@@ -16,7 +16,12 @@ function formatYen(value) {
     : '---円';
 }
 
-function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
+function ProcessPayment({
+  invoiceNumber,
+  myAccountNumber,
+  onSwitchAccount,
+  onPaymentComplete,
+}) {
   const navigate = useNavigate();
   const [invoiceInfo, setInvoiceInfo] = useState(null);
   const [issuer, setIssuer] = useState(null);
@@ -100,6 +105,14 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
     }
   }
 
+  function handleReturnAfterPayment() {
+    if (onPaymentComplete) {
+      onPaymentComplete(result);
+      return;
+    }
+    navigate('/');
+  }
+
   if (result) {
     return (
       <main className="payment-screen payment-complete">
@@ -122,7 +135,7 @@ function ProcessPayment({ invoiceNumber, myAccountNumber, onSwitchAccount }) {
         <NavigationButton
           width="100%"
           height="54px"
-          onClick={() => navigate('/')}
+          onClick={handleReturnAfterPayment}
         >
           トップへ戻る
         </NavigationButton>
