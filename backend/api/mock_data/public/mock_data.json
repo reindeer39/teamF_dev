@@ -28,18 +28,18 @@
       "account_balance": 30000
     },
     {
-      "account_number": "1000003",
-      "login_username": "suzuki",
-      "login_email": "suzuki@example.com",
+      "account_number": "1000004",
+      "login_username": "shinomiya",
+      "login_email": "shinomiya@example.com",
       "login_password": "teamf-dev-pass",
       "user_icon": "avatar-04.png",
-      "user_name": "佐藤四郎",
+      "user_name": "四宮四郎",
       "account_balance": 30000
     },
     {
-      "account_number": "1000003",
-      "login_username": "suzuki",
-      "login_email": "suzuki@example.com",
+      "account_number": "1000005",
+      "login_username": "tanaka",
+      "login_email": "tanaka@example.com",
       "login_password": "teamf-dev-pass",
       "user_icon": "avatar-05.png",
       "user_name": "田中五郎",
